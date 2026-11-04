@@ -44,12 +44,14 @@
     border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
   input[type=search] { flex: 1; min-width: 180px; }
   .count { color: var(--muted); font-size: 13px; }
-  .tablewrap { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; }
+  /* overflow: clip keeps the rounded corners without making the wrapper a scroll container:
+     with overflow-x: auto the sticky headers stuck to the wrapper instead of the page and covered the first row */
+  .tablewrap { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: clip; }
   table { width: 100%; border-collapse: collapse; }
   th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line);
     vertical-align: top; font-size: 13px; }
   th { color: var(--muted); font-weight: 600; user-select: none; position: sticky;
-    top: calc(env(safe-area-inset-top, 0px) + 54px); background: var(--panel); white-space: nowrap; }
+    top: calc(env(safe-area-inset-top, 0px) + var(--head-h, 58px)); background: var(--panel); white-space: nowrap; z-index: 1; }
   th.sortable { cursor: pointer; } th.sortable:hover { color: var(--ink); }
   tbody tr:nth-child(even) { background: var(--row); }
   tbody tr.click { cursor: pointer; }
@@ -292,6 +294,11 @@ $("#theme").onclick = () => {
   try { localStorage.setItem("theme", next); } catch (e) {}
 };
 try { const t = localStorage.getItem("theme"); if (t) document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+
+// ---- sticky table headers sit right below the page header, whatever its height (it wraps on narrow screens) ----
+const syncHeadHeight = () => document.documentElement.style.setProperty("--head-h", $("header").offsetHeight + "px");
+syncHeadHeight();
+window.addEventListener("resize", syncHeadHeight);
 
 // ---- tabs ----
 function show(which) {
