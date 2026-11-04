@@ -43,6 +43,17 @@ def safe_scan_dir(name):
     return d
 
 
+def scan_started_at(path):
+    """Start time (unix) of a scan from the SCAN event in its output.json, or None."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            first = json.loads(fh.readline() or "{}")
+    except (OSError, ValueError):
+        return None
+    started = (first.get("data_json") or {}).get("started_at") if first.get("type") == "SCAN" else None
+    return float(started) if isinstance(started, (int, float)) else None
+
+
 def safe_scan_path(name):
     d = safe_scan_dir(name)
     if d is None:
@@ -384,8 +395,11 @@ def running_job():
     return None
 
 
-def start_scan(payload, known_sources):
-    """payload: {targets, name?, modules?: [...]} - empty modules = the whole passive set."""
+def start_scan(payload, known_sources, on_finish=None, meta=None):
+    """payload: {targets, name?, modules?: [...]} - empty modules = the whole passive set.
+
+    on_finish(name, returncode) is called from a watcher thread when the BBoT process exits;
+    meta (e.g. company/schedule ids) is kept with the job and shown in job_info."""
     targets = parse_targets(payload.get("targets"))
     name = str(payload.get("name") or "").strip().lower() or default_name(targets)
     if not NAME_RE.match(name):
@@ -411,8 +425,21 @@ def start_scan(payload, known_sources):
             start_new_session=True, env=_child_env(), preexec_fn=_restore_sigint,  # noqa: PLW1509
         )
     with _lock:
-        _jobs[name] = {"proc": proc, "targets": targets, "modules": modules, "started": time.time(), "log": log_path}
+        _jobs[name] = {"proc": proc, "targets": targets, "modules": modules, "started": time.time(), "log": log_path,
+                       "meta": dict(meta or {})}  # fmt: skip
+    if on_finish is not None:
+        threading.Thread(target=_watch, args=(name, proc, on_finish), daemon=True).start()
     return job_info(name)
+
+
+def _watch(name, proc, on_finish):
+    rc = proc.wait()
+    try:
+        on_finish(name, rc)
+    except Exception as e:  # noqa: BLE001 - post-processing must never kill the server
+        import sys
+
+        sys.stderr.write(f"  post-processing of scan {name} failed: {e}\n")
 
 
 def _tail(path, n=12):
@@ -439,6 +466,7 @@ def job_info(name):
         "running": rc is None,
         "returncode": rc,
         "stopping": j.get("stopping", False),
+        "meta": j.get("meta", {}),
         "log": _tail(j["log"]),
     }
 

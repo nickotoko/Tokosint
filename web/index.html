@@ -122,6 +122,15 @@
   .keyform { display: flex; gap: 6px; } .keyform input { font: 12.5px var(--mono); padding: 5px 8px; border: 1px solid var(--line);
     border-radius: 7px; background: var(--panel); color: var(--ink); min-width: 220px; }
   .btn.sm { padding: 4px 10px; font-size: 12.5px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
+  .panel h3 { margin: 0 0 4px; font-size: 14px; }
+  .chips-row { margin-bottom: 12px; }
+  .tl-scan { margin-bottom: 16px; }
+  .tl-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin: 0 0 6px; font-size: 13px; }
+  .tl-head b { font-family: var(--mono); }
+  .form label.inline { display: flex; gap: 6px; align-items: center; text-transform: none; letter-spacing: 0; color: var(--ink); font-size: 13px; }
+  .sched { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+  .sched code { font-family: var(--mono); }
   .kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
   .kpi { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
   .kpi .v { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
@@ -141,6 +150,8 @@
   <h1>Tokosint</h1>
   <nav>
     <button id="tab-results" class="on">Analysis</button>
+    <button id="tab-timeline">Timeline</button>
+    <button id="tab-companies">Companies</button>
     <button id="tab-sources">Sources</button>
     <button id="tab-keys">Keys</button>
   </nav>
@@ -226,7 +237,54 @@
     </tr></thead><tbody id="r-body"></tbody></table></div>
     <div class="empty" id="r-empty">Choose a scan to see its findings.</div>
   </section>
+  <section id="view-timeline" hidden>
+    <div class="bar">
+      <select id="t-company"><option value="">— choose a company —</option></select>
+      <select id="t-kind">
+        <option value="new">new findings</option>
+        <option value="">new + baseline</option>
+        <option value="baseline">baseline only</option>
+      </select>
+      <select id="t-type"><option value="">all types</option></select>
+      <input type="search" id="t-q" placeholder="Search findings…" />
+      <span class="count" id="t-count"></span>
+    </div>
+    <div class="chips-row" id="t-summary"></div>
+    <div id="t-body"></div>
+    <div class="empty" id="t-empty">Choose a company. The first scan of a company is its baseline; later scans add the
+      valid findings the company has not had before.</div>
+  </section>
+
+  <section id="view-companies" hidden>
+    <div class="bar">
+      <button class="btn primary" id="c-new">＋ New company</button>
+      <span class="count" id="c-count"></span>
+    </div>
+    <div class="tablewrap"><table id="c-table"><thead><tr>
+      <th>Company</th><th>Targets</th><th class="num">Findings</th><th class="num">Scans</th><th>Last scan</th>
+      <th>Schedules</th><th>Alerts</th><th></th>
+    </tr></thead><tbody id="c-body"></tbody></table></div>
+    <div class="empty" id="c-empty" hidden>No companies yet. Create one, then start scans for it or attach existing scans.</div>
+  </section>
+
   <section id="view-keys" hidden>
+    <div class="panel" id="tg-panel">
+      <h3>Telegram alerts</h3>
+      <div class="hint">One summary message per company scan, only when new valid findings of the company's alert types
+        appear. Create a bot with @BotFather, add it to a chat and put the chat id here (a company may override it).</div>
+      <div class="keyform" style="margin-top:10px">
+        <input type="password" id="tg-token" placeholder="bot token" autocomplete="off" />
+        <button class="btn sm primary" id="tg-token-save">Save token</button>
+        <button class="btn sm danger" id="tg-token-del">Delete token</button>
+        <span class="st" id="tg-token-state"></span>
+      </div>
+      <div class="keyform" style="margin-top:8px">
+        <input type="text" id="tg-chat" placeholder="default chat id, e.g. -1001234567890" />
+        <button class="btn sm primary" id="tg-chat-save">Save chat id</button>
+        <button class="btn sm" id="tg-test">Send test message</button>
+        <span class="muted" id="tg-msg"></span>
+      </div>
+    </div>
     <div class="bar">
       <input type="search" id="k-q" placeholder="Search by source…" />
       <select id="k-state">
@@ -253,6 +311,9 @@
 <dialog id="dlg-scan">
   <div class="dlg-head"><h2>New scan</h2><button class="x" id="scan-x">&times;</button></div>
   <div class="dlg-body form">
+    <label for="scan-company">Company</label>
+    <select id="scan-company"><option value="">— none —</option></select>
+    <div class="hint">A company scan feeds the company's timeline and alerts; its targets are filled in below.</div>
     <label for="scan-targets">Targets</label>
     <textarea id="scan-targets" placeholder="target.example&#10;related.example&#10;198.51.100.0/24"></textarea>
     <div class="hint">Domains, IPs or networks, one per line (or separated by spaces/commas), up to 20.</div>
@@ -273,6 +334,53 @@
       <span class="err" id="scan-err"></span>
       <button class="btn" id="scan-cancel">Cancel</button>
       <button class="btn primary" id="scan-go">Start</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlg-company" class="wide">
+  <div class="dlg-head"><h2 id="co-title">Company</h2><button class="x" id="co-x">&times;</button></div>
+  <div class="dlg-body form">
+    <label for="co-name">Name</label>
+    <input type="text" id="co-name" />
+    <label for="co-targets">Targets</label>
+    <textarea id="co-targets" placeholder="target.example&#10;198.51.100.0/24"></textarea>
+    <div class="hint">Root domains, IPs or networks used for the company's scans, up to 20.</div>
+    <label for="co-desc">Description</label>
+    <input type="text" id="co-desc" />
+    <label>Telegram alerts</label>
+    <label class="inline"><input type="checkbox" id="co-alerts" checked /> send alerts about new valid findings</label>
+    <div class="hint">Alert types (none checked = all types):</div>
+    <div class="srcgrid" id="co-types"></div>
+    <input type="text" id="co-chat" placeholder="chat id override (optional)" style="margin-top:8px" />
+    <div id="co-sched-wrap" hidden>
+      <label>Scheduled scans</label>
+      <div id="co-scheds"></div>
+      <div class="keyform" style="margin-top:6px">
+        <input type="text" id="co-cron" placeholder="cron, e.g. 0 3 * * 1  (minute hour day month weekday)" />
+        <button class="btn sm primary" id="co-cron-add">Add schedule</button>
+      </div>
+      <div class="hint" id="co-cron-preview">Runs use the whole passive set. Missed runs (server stopped) run once on start.</div>
+    </div>
+    <div class="actions">
+      <span class="err" id="co-err"></span>
+      <button class="btn danger" id="co-delete" hidden>Delete company</button>
+      <button class="btn" id="co-cancel">Close</button>
+      <button class="btn primary" id="co-save">Save</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlg-attach">
+  <div class="dlg-head"><h2 id="at-title">Attach scans</h2><button class="x" id="at-x">&times;</button></div>
+  <div class="dlg-body form">
+    <div class="hint">Existing scans not linked to a company. Attaching rebuilds the company's registry and timeline from all
+      its scans in chronological order, without alerts. Only finished scans are counted.</div>
+    <div class="srcgrid" id="at-list" style="grid-template-columns: 1fr"></div>
+    <div class="actions">
+      <span class="err" id="at-err"></span>
+      <button class="btn" id="at-cancel">Cancel</button>
+      <button class="btn primary" id="at-go">Attach</button>
     </div>
   </div>
 </dialog>
@@ -334,15 +442,20 @@ window.addEventListener("resize", syncHeadHeight);
 
 // ---- tabs ----
 function show(which) {
-  for (const v of ["results", "sources", "keys"]) {
+  for (const v of ["results", "timeline", "companies", "sources", "keys"]) {
     $("#view-" + v).hidden = v !== which;
     $("#tab-" + v).classList.toggle("on", v === which);
   }
-  if (which === "keys") loadKeys();
+  if (which === "keys") { loadKeys(); loadTelegram(); }
+  if (which === "companies") loadCompanies();
+  if (which === "timeline") loadCompanies().then(loadTimeline);
 }
 $("#tab-results").onclick = () => show("results");
 $("#tab-sources").onclick = () => show("sources");
 $("#tab-keys").onclick = () => show("keys");
+$("#tab-timeline").onclick = () => show("timeline");
+$("#tab-companies").onclick = () => show("companies");
+if (location.hash === "#timeline") show("timeline");
 
 function fillSelect(sel, values, keepFirst = true) {
   while (sel.options.length > (keepFirst ? 1 : 0)) sel.remove(sel.options.length - 1);
@@ -518,7 +631,7 @@ function loadScanList(select) {
     while (sel.options.length > 1) sel.remove(1);
     for (const s of scans) {
       const d = new Date(s.mtime * 1000).toISOString().slice(0, 10);
-      const o = el("option", null, `${s.name} · ${s.events} events · ${d}${s.running ? " · running" : ""}`);
+      const o = el("option", null, `${s.name} · ${s.events} events · ${d}${s.company ? " · " + s.company : ""}${s.running ? " · running" : ""}`);
       o.value = s.name; sel.appendChild(o);
     }
     if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
@@ -623,7 +736,17 @@ $("#r-new").onclick = () => {
     });
   }
   $("#scan-err").textContent = ""; renderPickCount();
+  loadCompanies().then(() => {
+    const sel = $("#scan-company"), cur = sel.value;
+    while (sel.options.length > 1) sel.remove(1);
+    COMPANIES.forEach((c) => { const o = el("option", null, c.name); o.value = c.id; sel.appendChild(o); });
+    sel.value = cur;
+  });
   $("#dlg-scan").showModal(); $("#scan-targets").focus();
+};
+$("#scan-company").onchange = () => {
+  const c = COMPANIES.find((x) => String(x.id) === $("#scan-company").value);
+  if (c) $("#scan-targets").value = c.targets.join("\n");
 };
 $("#scan-mode").onchange = () => { $("#scan-pick").hidden = $("#scan-mode").value !== "pick"; };
 $("#scan-x").onclick = $("#scan-cancel").onclick = () => $("#dlg-scan").close();
@@ -631,7 +754,8 @@ $("#scan-go").onclick = () => {
   const modules = $("#scan-mode").value === "pick" ? [...document.querySelectorAll("#scan-sources input:checked")].map((c) => c.value) : [];
   if ($("#scan-mode").value === "pick" && !modules.length) { $("#scan-err").textContent = "Pick at least one source."; return; }
   $("#scan-go").disabled = true; $("#scan-err").textContent = "";
-  postJSON("/api/scans/start", { targets: $("#scan-targets").value, name: $("#scan-name").value.trim(), modules })
+  postJSON("/api/scans/start", { targets: $("#scan-targets").value, name: $("#scan-name").value.trim(), modules,
+    company_id: $("#scan-company").value ? Number($("#scan-company").value) : null })
     .then((job) => { $("#dlg-scan").close(); $("#scan-targets").value = ""; $("#scan-name").value = ""; renderJob(job); pollJobs(); })
     .catch((e) => { $("#scan-err").textContent = e.message; })
     .finally(() => { $("#scan-go").disabled = false; });
@@ -761,6 +885,204 @@ $("#r-report").onclick = () => {
   }).catch((e) => { $("#rep-body").innerHTML = ""; $("#rep-body").appendChild(el("div", "empty", "Failed to build the report: " + e.message)); });
 };
 $("#rep-x").onclick = () => $("#dlg-report").close();
+
+// ---------- companies ----------
+let COMPANIES = [], CO_EDIT = null;
+const ALERT_TYPES = ["DNS_NAME", "IP_ADDRESS", "OPEN_TCP_PORT", "URL", "EMAIL_ADDRESS", "FINDING", "TECHNOLOGY",
+  "CODE_REPOSITORY", "SOCIAL", "MOBILE_APP", "ASN", "STORAGE_BUCKET"];
+const fmtTsShort = (ts) => ts ? fmtSeen(ts) : "—";
+function loadCompanies() {
+  return fetch("/api/companies").then((r) => r.json()).then((d) => { COMPANIES = Array.isArray(d) ? d : []; renderCompanies(); fillCompanySelect(); return COMPANIES; })
+    .catch(() => COMPANIES);
+}
+function fillCompanySelect() {
+  const sel = $("#t-company"), cur = sel.value;
+  while (sel.options.length > 1) sel.remove(1);
+  COMPANIES.forEach((c) => { const o = el("option", null, c.name); o.value = c.id; sel.appendChild(o); });
+  if (cur && [...sel.options].some((o) => o.value === cur)) sel.value = cur;
+  else if (COMPANIES.length === 1) sel.value = String(COMPANIES[0].id);  // the only company: pick it
+}
+function renderCompanies() {
+  const body = $("#c-body"); body.innerHTML = "";
+  $("#c-empty").hidden = COMPANIES.length > 0;
+  for (const c of COMPANIES) {
+    const tr = el("tr");
+    const tdN = el("td"); tdN.appendChild(el("div", "name", c.name)); if (c.description) tdN.appendChild(el("div", "muted", c.description)); tr.appendChild(tdN);
+    const tdT = el("td"); chips(tdT, c.targets); tr.appendChild(tdT);
+    tr.appendChild(el("td", "num", String(c.asset_count)));
+    tr.appendChild(el("td", "num", String(c.scan_count)));
+    tr.appendChild(el("td", "seen", fmtTsShort(c.last_scan_at)));
+    const tdS = el("td"); if (!c.schedules.length) tdS.appendChild(el("span", "muted", "—"));
+    c.schedules.forEach((s) => { const x = el("div", "ctx"); x.appendChild(el("code", null, s.cron));
+      x.appendChild(document.createTextNode(s.enabled ? ` · next ${fmtTsShort(s.next_run)}` : " · paused")); tdS.appendChild(x); });
+    tr.appendChild(tdS);
+    tr.appendChild(el("td", null, c.alerts_enabled ? (c.alert_types.length ? c.alert_types.join(", ") : "all types") : "off"));
+    const tdA = el("td"); const f = el("div", "keyform");
+    const b1 = el("button", "btn sm", "Edit"); b1.onclick = () => openCompany(c);
+    const b2 = el("button", "btn sm primary", "Scan now"); b2.onclick = () => scanCompany(c, b2);
+    const b3 = el("button", "btn sm", "Attach scans"); b3.onclick = () => openAttach(c);
+    const b4 = el("button", "btn sm", "Timeline"); b4.onclick = () => { show("timeline"); $("#t-company").value = String(c.id); loadTimeline(); };
+    [b1, b2, b3, b4].forEach((b) => f.appendChild(b)); tdA.appendChild(f); tr.appendChild(tdA);
+    body.appendChild(tr);
+  }
+  $("#c-count").textContent = `${COMPANIES.length} compan${COMPANIES.length === 1 ? "y" : "ies"}`;
+}
+function scanCompany(c, btn) {
+  if (!confirm(`Start a scan of ${c.name} (${c.targets.join(", ")}) with the whole passive set?`)) return;
+  btn.disabled = true;
+  postJSON("/api/scans/start", { company_id: c.id }).then((job) => { show("results"); renderJob(job); pollJobs(); })
+    .catch((e) => alert(e.message)).finally(() => { btn.disabled = false; });
+}
+function renderTypeGrid(selected) {
+  const g = $("#co-types"); g.innerHTML = "";
+  ALERT_TYPES.forEach((t) => { const lb = el("label"); const cb = el("input"); cb.type = "checkbox"; cb.value = t; cb.checked = selected.includes(t);
+    lb.appendChild(cb); lb.appendChild(document.createTextNode(t)); g.appendChild(lb); });
+}
+function renderSchedules(c) {
+  const box = $("#co-scheds"); box.innerHTML = "";
+  if (!c.schedules.length) box.appendChild(el("div", "muted", "No schedules."));
+  c.schedules.forEach((s) => {
+    const row = el("div", "sched");
+    row.appendChild(el("code", null, s.cron));
+    row.appendChild(el("span", "muted", s.enabled ? `next ${fmtTsShort(s.next_run)}` : "paused"));
+    row.appendChild(el("span", "muted", s.last_scan ? `last: ${s.last_scan} (${fmtTsShort(s.last_run)})` : "never ran"));
+    if (s.pending) row.appendChild(el("span", "st nodata", "waiting for a free slot"));
+    const tog = el("button", "btn sm", s.enabled ? "Pause" : "Resume");
+    tog.onclick = () => postJSON("/api/schedules/save", { id: s.id, company_id: c.id, cron: s.cron, modules: s.modules, enabled: !s.enabled })
+      .then(refreshCompanyDialog).catch((e) => { $("#co-err").textContent = e.message; });
+    const del = el("button", "btn sm danger", "Delete");
+    del.onclick = () => { if (confirm(`Delete schedule ${s.cron}?`)) postJSON("/api/schedules/delete", { id: s.id }).then(refreshCompanyDialog).catch((e) => { $("#co-err").textContent = e.message; }); };
+    row.appendChild(tog); row.appendChild(del); box.appendChild(row);
+  });
+}
+function refreshCompanyDialog() {
+  return loadCompanies().then(() => { const c = COMPANIES.find((x) => x.id === CO_EDIT); if (c) renderSchedules(c); });
+}
+function openCompany(c) {
+  CO_EDIT = c ? c.id : null;
+  $("#co-title").textContent = c ? `Company: ${c.name}` : "New company";
+  $("#co-name").value = c ? c.name : ""; $("#co-targets").value = c ? c.targets.join("\n") : "";
+  $("#co-desc").value = c ? c.description : ""; $("#co-alerts").checked = c ? !!c.alerts_enabled : true;
+  $("#co-chat").value = c ? c.telegram_chat_id : ""; $("#co-cron").value = ""; $("#co-err").textContent = "";
+  renderTypeGrid(c ? c.alert_types : ["DNS_NAME", "IP_ADDRESS", "OPEN_TCP_PORT", "FINDING"]);
+  $("#co-sched-wrap").hidden = !c; $("#co-delete").hidden = !c;
+  if (c) renderSchedules(c);
+  $("#dlg-company").showModal();
+}
+$("#c-new").onclick = () => openCompany(null);
+$("#co-x").onclick = $("#co-cancel").onclick = () => $("#dlg-company").close();
+$("#co-save").onclick = () => {
+  const data = { id: CO_EDIT, name: $("#co-name").value.trim(), targets: $("#co-targets").value, description: $("#co-desc").value.trim(),
+    alerts_enabled: $("#co-alerts").checked, telegram_chat_id: $("#co-chat").value.trim(),
+    alert_types: [...document.querySelectorAll("#co-types input:checked")].map((x) => x.value) };
+  postJSON("/api/companies/save", data).then((c) => { CO_EDIT = c.id; return loadCompanies(); })
+    .then(() => { const c = COMPANIES.find((x) => x.id === CO_EDIT); if (c) openCompany(c); })
+    .catch((e) => { $("#co-err").textContent = e.message; });
+};
+$("#co-delete").onclick = () => {
+  const c = COMPANIES.find((x) => x.id === CO_EDIT); if (!c) return;
+  if (!confirm(`Delete ${c.name} with its schedules, registry and timeline? Scan files are kept.`)) return;
+  postJSON("/api/companies/delete", { id: c.id }).then(() => { $("#dlg-company").close(); loadCompanies(); }).catch((e) => { $("#co-err").textContent = e.message; });
+};
+let cronTimer = null;
+$("#co-cron").oninput = () => {
+  clearTimeout(cronTimer);
+  const expr = $("#co-cron").value.trim();
+  if (!expr) { $("#co-cron-preview").textContent = "Runs use the whole passive set. Missed runs (server stopped) run once on start."; return; }
+  cronTimer = setTimeout(() => fetch("/api/cron?expr=" + encodeURIComponent(expr)).then((r) => r.json())
+    .then((d) => { $("#co-cron-preview").textContent = d.error ? "✗ " + d.error : "next runs: " + d.next.join(" · "); }), 250);
+};
+$("#co-cron-add").onclick = () => {
+  if (!CO_EDIT) return;
+  postJSON("/api/schedules/save", { company_id: CO_EDIT, cron: $("#co-cron").value.trim(), modules: [], enabled: true })
+    .then(() => { $("#co-cron").value = ""; $("#co-cron").oninput(); return refreshCompanyDialog(); })
+    .catch((e) => { $("#co-err").textContent = e.message; });
+};
+let AT_COMPANY = null;
+function openAttach(c) {
+  AT_COMPANY = c; $("#at-title").textContent = `Attach scans to ${c.name}`; $("#at-err").textContent = "";
+  const list = $("#at-list"); list.innerHTML = "Loading…";
+  fetch("/api/scans").then((r) => r.json()).then((scans) => {
+    list.innerHTML = "";
+    const free = scans.filter((s) => !s.company && !s.running);
+    if (!free.length) list.appendChild(el("div", "muted", "No unlinked scans."));
+    free.forEach((s) => { const lb = el("label"); const cb = el("input"); cb.type = "checkbox"; cb.value = s.name;
+      lb.appendChild(cb); lb.appendChild(document.createTextNode(`${s.name} · ${s.events} events · ${new Date(s.mtime * 1000).toISOString().slice(0, 10)}`)); list.appendChild(lb); });
+  });
+  $("#dlg-attach").showModal();
+}
+$("#at-x").onclick = $("#at-cancel").onclick = () => $("#dlg-attach").close();
+$("#at-go").onclick = () => {
+  const names = [...document.querySelectorAll("#at-list input:checked")].map((x) => x.value);
+  if (!names.length) { $("#at-err").textContent = "Pick at least one scan."; return; }
+  $("#at-go").disabled = true;
+  postJSON("/api/companies/attach", { id: AT_COMPANY.id, scans: names })
+    .then(() => { $("#dlg-attach").close(); loadCompanies(); loadScanList(); })
+    .catch((e) => { $("#at-err").textContent = e.message; }).finally(() => { $("#at-go").disabled = false; });
+};
+
+// ---------- timeline ----------
+let TIMELINE = null;
+function loadTimeline() {
+  const cid = $("#t-company").value;
+  if (!cid) { TIMELINE = null; renderTimeline(); return; }
+  fetch(`/api/timeline/${cid}?kind=${encodeURIComponent($("#t-kind").value)}`).then((r) => r.json())
+    .then((d) => { TIMELINE = d; const types = [...new Set(d.events.map((e) => e.type))].sort(); fillSelect($("#t-type"), types); renderTimeline(); });
+}
+function renderTimeline() {
+  const body = $("#t-body"), sum = $("#t-summary"); body.innerHTML = ""; sum.innerHTML = "";
+  if (!TIMELINE) { $("#t-empty").hidden = false; $("#t-count").textContent = ""; return; }
+  const type = $("#t-type").value, q = $("#t-q").value.trim().toLowerCase();
+  const events = TIMELINE.events.filter((e) => (!type || e.type === type) && (!q || e.data.toLowerCase().includes(q)));
+  $("#t-empty").hidden = events.length > 0 || TIMELINE.scans.length > 0;
+  typeChips(sum, TIMELINE.new_by_type);
+  if (Object.keys(TIMELINE.new_by_type).length) sum.insertBefore(el("span", "muted", "new since the baseline: "), sum.firstChild);
+  const byScan = {}; events.forEach((e) => { (byScan[e.scan] = byScan[e.scan] || []).push(e); });
+  for (const s of TIMELINE.scans) {
+    const list = byScan[s.scan] || [];
+    const box = el("div", "tl-scan");
+    const head = el("div", "tl-head");
+    head.appendChild(el("span", "seen", fmtTsShort(s.started_at)));
+    head.appendChild(el("b", null, s.scan));
+    if (!s.ingested_at) head.appendChild(el("span", "st nodata", s.alert || "not ingested yet"));
+    else if (s.baseline) head.appendChild(el("span", "st local", `baseline · ${s.valid_count} valid findings`));
+    else head.appendChild(el("span", "st " + (s.new_count ? "valid" : "none"), `${s.new_count} new · ${s.valid_count} valid`));
+    if (s.alert && s.ingested_at) head.appendChild(el("span", "muted", s.alert));
+    box.appendChild(head);
+    if (list.length) {
+      const wrap = el("div", "tablewrap"); const t = el("table"); const tb = el("tbody");
+      for (const e of list) {
+        const tr = el("tr");
+        const tdT = el("td", "type"); tdT.appendChild(el("span", "chip", e.type)); tr.appendChild(tdT);
+        const tdD = el("td", "data", e.data); if (e.details && e.details.description) tdD.appendChild(el("div", "muted desc", e.details.description.slice(0, 200))); tr.appendChild(tdD);
+        const tdS = el("td"); chips(tdS, e.sources); tr.appendChild(tdS);
+        tr.appendChild(el("td", "muted", (e.kind === "baseline" ? "baseline" : "new") + (e.third_party ? " · third party" : "")));
+        tb.appendChild(tr);
+      }
+      t.appendChild(tb); wrap.appendChild(t); box.appendChild(wrap);
+    }
+    if (list.length || !type && !q) body.appendChild(box);
+  }
+  $("#t-count").textContent = `${events.length} event(s) · ${TIMELINE.scans.length} scan(s)`;
+}
+$("#t-company").onchange = loadTimeline;
+$("#t-kind").oninput = loadTimeline;
+["t-type", "t-q"].forEach((id) => { $("#" + id).oninput = renderTimeline; });
+
+// ---------- telegram settings ----------
+function renderTelegram(d) {
+  $("#tg-token-state").className = "st " + (d.token_set ? "ok" : "none");
+  $("#tg-token-state").textContent = d.token_set ? `token ${d.token_masked}` : "no token";
+  $("#tg-chat").value = d.chat_id || "";
+}
+function loadTelegram() { fetch("/api/telegram").then((r) => r.json()).then(renderTelegram).catch(() => {}); }
+const tgSave = (body, msg) => postJSON("/api/telegram/save", body).then((d) => { renderTelegram(d); $("#tg-msg").textContent = msg; })
+  .catch((e) => { $("#tg-msg").textContent = e.message; });
+$("#tg-token-save").onclick = () => { const v = $("#tg-token").value.trim(); if (!v) return; tgSave({ token: v }, "token saved"); $("#tg-token").value = ""; };
+$("#tg-token-del").onclick = () => { if (confirm("Delete the Telegram bot token?")) tgSave({ token: "" }, "token deleted"); };
+$("#tg-chat-save").onclick = () => tgSave({ chat_id: $("#tg-chat").value.trim() }, "chat id saved");
+$("#tg-test").onclick = () => { $("#tg-msg").textContent = "sending…";
+  postJSON("/api/telegram/test", {}).then(() => { $("#tg-msg").textContent = "test message sent"; }).catch((e) => { $("#tg-msg").textContent = e.message; }); };
 
 // ---------- export ----------
 const expFilter = () => {

@@ -60,8 +60,19 @@ Fixed or reworked, among others: `virustotal` (pagination), `shodan_idb` (API ke
   DNS check and third-party tag; filters, sorting, a details card with the discovery context;
   a per-source report (what each source found and how much, which sources did not start and why).
   Export to CSV or JSON: the full scan or one finding type, filtered by source and validation status.
+- **Timeline** — new valid findings of a company scan after scan. The first scan of a company is its baseline;
+  every later scan adds the valid findings the company did not have before.
+- **Companies** — name, targets, description, Telegram alert settings and the finding types to alert on; scheduled scans
+  in cron format (`0 3 * * 1`, `*/30 9-18 * * mon-fri`, `@daily`) with a preview of the next runs; attaching existing
+  scans (the timeline is rebuilt in chronological order, without alerts); starting a scan for a company.
 - **Sources** — module metadata: input/output, API key, quotas, data freshness, health check result.
 - **Keys** — add, change and delete API keys (values are never sent back to the UI, only a mask).
+- **Telegram alerts** — after a company scan, one summary message, only when new valid findings of the company's alert
+  types appear (baseline scans never alert). The bot token and chat id are set on the Keys tab.
+
+Companies, schedules, the findings registry and the timeline live in SQLite (`data/tokosint.db`, mode 600, not in git).
+Scheduled scans run while `bin/web` is running; a run missed while the server was down runs once on start, and a run that
+finds another scan in progress waits for it. Only finished scans are added to a company's registry.
 
 ## Installation
 
@@ -100,7 +111,7 @@ bin/healthcheck
 
 # tests
 cd bbot && .venv/bin/pytest bbot/test/test_step_2/module_tests/test_module_validity.py -q
-bbot/.venv/bin/pytest web/test_validity.py -q
+bbot/.venv/bin/pytest web/ -q
 ```
 
 ## Limitations
@@ -117,7 +128,8 @@ bbot/.venv/bin/pytest web/test_validity.py -q
   `related_domains` promotes it (NS/MX/SPF/DMARC). WHOIS and certificate relations are not used yet.
 - **Source quotas:** many free tiers are small (e.g. hunter.io — 50 requests a month, VirusTotal — 500 a day);
   the web server runs a deep health check once a day, which spends them too. Some sources do not work without a key.
-- **One scan at a time** when started from the UI; the running scan's status is kept in the server's memory.
+- **One scan at a time** when started from the UI or a schedule; the running scan's status is kept in the server's memory.
+- **Schedules need the server:** scheduled scans run only while `bin/web` is running (run it as a service to keep them going).
 - Some upstream BBoT tests refer to archived modules and fail.
 - Tested on macOS; Linux should work the same (BBoT targets it), Windows is untested.
 
@@ -127,7 +139,10 @@ bbot/.venv/bin/pytest web/test_validity.py -q
 bbot/            BBoT 3.0.2 fork (modules, core, tests); bbot/modules_archive/ — modules outside the active set
 bin/             osint (scan), web (UI), module (module set and keys), healthcheck
 config/          bbot.yml — project config; secrets.yml — API keys (not in git), secrets.example.yml — template
-web/             server.py, scans.py, validity.py, apikeys.py, health.py, index.html
+web/             server.py, scans.py, validity.py, apikeys.py, health.py, index.html,
+                 store.py (SQLite), companies.py (company scans, scheduler), notify.py (Telegram), cronexpr.py
+tools/           cdp_drive.py — headless Chrome driver for checking the web UI
+data/            tokosint.db — companies, timeline, settings (not in git)
 scans/           scan results (not in git)
 ```
 

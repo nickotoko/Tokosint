@@ -20,3 +20,6 @@ pytest_debug.log
 
 # generated health check result
 web/health.json
+
+# Tokosint state: companies, timeline, Telegram bot token
+data/

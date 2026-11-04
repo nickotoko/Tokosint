@@ -13,6 +13,17 @@ Routes:
   GET /api/keys             source API keys: set or not (masked), field description
   POST /api/keys/set        {"module", "field", "value"} - add/change a key in config/secrets.yml
   POST /api/keys/delete     {"module", "field"} - delete a key
+  GET /api/companies        companies with their schedules
+  POST /api/companies/save  {"id"?, "name", "description", "targets", "alerts_enabled", "alert_types", "telegram_chat_id"}
+  POST /api/companies/delete {"id"} - company, schedules, registry and timeline (scan files are kept)
+  POST /api/companies/attach {"id", "scans": [...]} - link existing scans and rebuild the timeline (no alerts)
+  GET /api/timeline/<id>    timeline of a company (?type=, ?kind=new|baseline)
+  POST /api/schedules/save  {"id"?, "company_id", "cron", "modules", "enabled"}
+  POST /api/schedules/delete {"id"}
+  GET /api/cron?expr=...    validate a cron expression and show the next runs
+  GET /api/telegram         Telegram settings (token masked)
+  POST /api/telegram/save   {"token"?, "chat_id"?}
+  POST /api/telegram/test   {"chat_id"?} - send a test message
 
 Started by bin/web. Listens on 127.0.0.1 and serves scans/ only to its own UI.
 """
@@ -22,7 +33,7 @@ import sys
 from functools import partial
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 WEB_DIR = Path(__file__).resolve().parent
 ROOT = WEB_DIR.parent
@@ -32,6 +43,10 @@ from _build import build_sources  # noqa: E402
 import health  # noqa: E402
 import scans  # noqa: E402
 import apikeys  # noqa: E402
+import companies  # noqa: E402
+import cronexpr  # noqa: E402
+import notify  # noqa: E402
+import store  # noqa: E402
 from bbot.core.modules import MODULE_LOADER  # noqa: E402
 
 
@@ -53,7 +68,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        route = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        route, query = parsed.path, {k: v[0] for k, v in parse_qs(parsed.query).items()}
         try:
             if route in ("/", "/index.html"):
                 return self._send_file(WEB_DIR / "index.html", "text/html; charset=utf-8")
@@ -62,11 +78,36 @@ class Handler(BaseHTTPRequestHandler):
             if route == "/api/health":
                 return self._send_json(health.load())
             if route == "/api/scans":
-                return self._send_json(scans.list_scans())
+                owners = store.scan_companies()
+                out = scans.list_scans()
+                for sc in out:
+                    sc["company"] = owners.get(sc["name"], "")
+                return self._send_json(out)
             if route == "/api/keys":
                 return self._send_json(apikeys.list_secrets(MODULE_LOADER.preloaded()))
             if route == "/api/jobs":
                 return self._send_json(scans.list_jobs())
+            if route == "/api/companies":
+                schedules = store.list_schedules()
+                out = store.list_companies()
+                for co in out:
+                    co["schedules"] = [s for s in schedules if s["company_id"] == co["id"]]
+                return self._send_json(out)
+            if route.startswith("/api/timeline/"):
+                cid = int(route[len("/api/timeline/"):])
+                return self._send_json(store.timeline(cid, kind=query.get("kind"), type_=query.get("type")))
+            if route == "/api/cron":
+                try:
+                    expr = cronexpr.validate(query.get("expr", ""))
+                except cronexpr.CronError as e:
+                    return self._send_json({"error": str(e)}, 400)
+                runs, t = [], None
+                for _ in range(3):
+                    t = cronexpr.next_run(expr, t)
+                    runs.append(t.strftime("%Y-%m-%d %H:%M"))
+                return self._send_json({"cron": expr, "next": runs})
+            if route == "/api/telegram":
+                return self._send_json(notify.settings_view())
             if route.startswith("/api/report/"):
                 producers = {s["name"] for s in build_sources() if s["produced_events"]}
                 report = scans.scan_report(unquote(route[len("/api/report/"):]), producers)
@@ -103,9 +144,36 @@ class Handler(BaseHTTPRequestHandler):
             payload = json.loads(self.rfile.read(length) or b"{}")
             if not isinstance(payload, dict):
                 raise scans.ScanError("a JSON object is expected")
+            known = {s["name"] for s in build_sources()}
             if route == "/api/scans/start":
-                known = {s["name"] for s in build_sources()}
+                if payload.get("company_id"):
+                    targets = scans.parse_targets(payload.get("targets")) if payload.get("targets") else None
+                    name = str(payload.get("name") or "").strip().lower() or None
+                    job = companies.start_company_scan(int(payload["company_id"]), payload.get("modules") or [], known,
+                                                       name=name, targets=targets)  # fmt: skip
+                    return self._send_json(job, 201)
                 return self._send_json(scans.start_scan(payload, known), 201)
+            if route == "/api/companies/save":
+                cid = int(payload["id"]) if payload.get("id") else None
+                return self._send_json(store.save_company(payload, cid, parse_targets=scans.parse_targets))
+            if route == "/api/companies/delete":
+                store.delete_company(int(payload.get("id") or 0))
+                return self._send_json({"ok": True})
+            if route == "/api/companies/attach":
+                names = [str(n) for n in (payload.get("scans") or [])]
+                return self._send_json(companies.attach_scans(int(payload.get("id") or 0), names))
+            if route == "/api/schedules/save":
+                sid = int(payload["id"]) if payload.get("id") else None
+                data = companies.schedule_payload(payload, known)
+                return self._send_json(store.save_schedule(data, companies.next_run_ts(data["cron"]), sid))
+            if route == "/api/schedules/delete":
+                store.delete_schedule(int(payload.get("id") or 0))
+                return self._send_json({"ok": True})
+            if route == "/api/telegram/save":
+                return self._send_json(notify.save_settings(payload))
+            if route == "/api/telegram/test":
+                ok, desc = notify.send("<b>Tokosint</b>: test message", payload.get("chat_id") or None)
+                return self._send_json({"ok": ok, "detail": desc}, 200 if ok else 502)
             if route in ("/api/keys/set", "/api/keys/delete"):
                 module, field = str(payload.get("module", "")), str(payload.get("field", ""))
                 if route.endswith("/set"):
@@ -115,8 +183,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json(apikeys.list_secrets(MODULE_LOADER.preloaded()))
             if route.startswith("/api/jobs/") and route.endswith("/stop"):
                 return self._send_json(scans.stop_scan(unquote(route[len("/api/jobs/"):-len("/stop")])))
-        except (scans.ScanError, apikeys.SecretError) as e:
+        except (scans.ScanError, apikeys.SecretError, store.StoreError) as e:
             return self._send_json({"error": str(e)}, e.code)
+        except cronexpr.CronError as e:  # a ValueError: must be caught before "invalid JSON"
+            return self._send_json({"error": f"cron: {e}"}, 400)
         except ValueError:
             return self._send_json({"error": "invalid JSON"}, 400)
         except Exception as e:  # noqa: BLE001
@@ -144,7 +214,11 @@ def main():
     import threading
 
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8777
+    store.init()
+    companies.BASE_URL = f"http://127.0.0.1:{port}/#timeline"
     threading.Thread(target=health_loop, daemon=True).start()
+    known = lambda: {s["name"] for s in build_sources()}  # noqa: E731
+    threading.Thread(target=companies.scheduler_loop, args=(known,), daemon=True).start()
     server = ThreadingHTTPServer(("127.0.0.1", port), partial(Handler))
     print(f"Open http://127.0.0.1:{port}/  (Ctrl+C to stop)")
     try:
