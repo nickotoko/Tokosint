@@ -43,15 +43,25 @@ def safe_scan_dir(name):
     return d
 
 
-def scan_started_at(path):
-    """Start time (unix) of a scan from the SCAN event in its output.json, or None."""
+def scan_head(path):
+    """(start time, targets) of a scan from the SCAN event on the first line of its output.json."""
     try:
         with open(path, encoding="utf-8") as fh:
             first = json.loads(fh.readline() or "{}")
     except (OSError, ValueError):
-        return None
-    started = (first.get("data_json") or {}).get("started_at") if first.get("type") == "SCAN" else None
-    return float(started) if isinstance(started, (int, float)) else None
+        return None, []
+    if first.get("type") != "SCAN":
+        return None, []
+    dj = first.get("data_json") or {}
+    started = dj.get("started_at")
+    target = dj.get("target") or {}
+    targets = target.get("seeds") or target.get("target") or []
+    return (float(started) if isinstance(started, (int, float)) else None), [str(t) for t in targets]
+
+
+def scan_started_at(path):
+    """Start time (unix) of a scan from the SCAN event in its output.json, or None."""
+    return scan_head(path)[0]
 
 
 def safe_scan_path(name):
@@ -508,7 +518,9 @@ def list_scans():
                         events = sum(1 for _ in fh)
                 except OSError:
                     events = 0
-                scans.append({"name": d.name, "events": events, "mtime": int(out.stat().st_mtime)})
+                started, targets = scan_head(out)
+                scans.append({"name": d.name, "events": events, "mtime": int(out.stat().st_mtime),
+                              "started_at": started, "targets": targets})  # fmt: skip
     running = running_job()
     for s in scans:
         s["running"] = s["name"] == running

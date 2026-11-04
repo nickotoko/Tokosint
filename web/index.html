@@ -122,6 +122,8 @@
   .keyform { display: flex; gap: 6px; } .keyform input { font: 12.5px var(--mono); padding: 5px 8px; border: 1px solid var(--line);
     border-radius: 7px; background: var(--panel); color: var(--ink); min-width: 220px; }
   .btn.sm { padding: 4px 10px; font-size: 12.5px; }
+  .srcgrid.scanpick { grid-template-columns: 1fr; }
+  .srcgrid.scanpick .chip { margin-left: 6px; }
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
   .panel h3 { margin: 0 0 4px; font-size: 14px; }
   .chips-row { margin-bottom: 12px; }
@@ -353,6 +355,10 @@
     <div class="hint">Alert types (none checked = all types):</div>
     <div class="srcgrid" id="co-types"></div>
     <input type="text" id="co-chat" placeholder="chat id override (optional)" style="margin-top:8px" />
+    <label>Existing scans</label>
+    <div class="hint">Scans not linked to any company; the ones whose targets match the company's are checked.
+      On save they are attached and the timeline is rebuilt in chronological order, without alerts.</div>
+    <div class="srcgrid scanpick" id="co-scans"></div>
     <div id="co-sched-wrap" hidden>
       <label>Scheduled scans</label>
       <div id="co-scheds"></div>
@@ -376,7 +382,7 @@
   <div class="dlg-body form">
     <div class="hint">Existing scans not linked to a company. Attaching rebuilds the company's registry and timeline from all
       its scans in chronological order, without alerts. Only finished scans are counted.</div>
-    <div class="srcgrid" id="at-list" style="grid-template-columns: 1fr"></div>
+    <div class="srcgrid scanpick" id="at-list"></div>
     <div class="actions">
       <span class="err" id="at-err"></span>
       <button class="btn" id="at-cancel">Cancel</button>
@@ -967,17 +973,32 @@ function openCompany(c) {
   renderTypeGrid(c ? c.alert_types : ["DNS_NAME", "IP_ADDRESS", "OPEN_TCP_PORT", "FINDING"]);
   $("#co-sched-wrap").hidden = !c; $("#co-delete").hidden = !c;
   if (c) renderSchedules(c);
+  // auto-check matching scans only for a new company; when editing they are highlighted, not checked
+  CO_SCANS_TOUCHED = !!c; $("#co-scans").innerHTML = "Loading…"; $("#co-err").className = "err";
+  loadFreeScans().then(() => renderScanPicker($("#co-scans"), $("#co-targets").value, !c));
   $("#dlg-company").showModal();
 }
+let CO_SCANS_TOUCHED = false;
+$("#co-scans").addEventListener("change", () => { CO_SCANS_TOUCHED = true; });
+$("#co-targets").addEventListener("input", () => { if (!CO_SCANS_TOUCHED) renderScanPicker($("#co-scans"), $("#co-targets").value, true); });
 $("#c-new").onclick = () => openCompany(null);
 $("#co-x").onclick = $("#co-cancel").onclick = () => $("#dlg-company").close();
 $("#co-save").onclick = () => {
   const data = { id: CO_EDIT, name: $("#co-name").value.trim(), targets: $("#co-targets").value, description: $("#co-desc").value.trim(),
     alerts_enabled: $("#co-alerts").checked, telegram_chat_id: $("#co-chat").value.trim(),
     alert_types: [...document.querySelectorAll("#co-types input:checked")].map((x) => x.value) };
-  postJSON("/api/companies/save", data).then((c) => { CO_EDIT = c.id; return loadCompanies(); })
-    .then(() => { const c = COMPANIES.find((x) => x.id === CO_EDIT); if (c) openCompany(c); })
-    .catch((e) => { $("#co-err").textContent = e.message; });
+  const attach = pickedScans($("#co-scans"));
+  $("#co-save").disabled = true;
+  postJSON("/api/companies/save", data)
+    .then((c) => { CO_EDIT = c.id; return attach.length ? postJSON("/api/companies/attach", { id: c.id, scans: attach }) : null; })
+    .then((done) => loadCompanies().then(() => {
+      const c = COMPANIES.find((x) => x.id === CO_EDIT); if (c) openCompany(c);
+      if (done) $("#co-err").className = "muted";
+      if (done) $("#co-err").textContent = `attached ${done.length} scan(s): ` + done.map((d) => `${d.scan} ${d.ingested ? "+" + d.new : "(not finished, skipped)"}`).join(", ");
+      loadScanList();
+    }))
+    .catch((e) => { $("#co-err").textContent = e.message; })
+    .finally(() => { $("#co-save").disabled = false; });
 };
 $("#co-delete").onclick = () => {
   const c = COMPANIES.find((x) => x.id === CO_EDIT); if (!c) return;
@@ -998,17 +1019,42 @@ $("#co-cron-add").onclick = () => {
     .then(() => { $("#co-cron").value = ""; $("#co-cron").oninput(); return refreshCompanyDialog(); })
     .catch((e) => { $("#co-err").textContent = e.message; });
 };
+// ---------- picking existing scans (company dialog and "Attach scans") ----------
+let FREE_SCANS = [];
+const splitTargets = (text) => String(text || "").toLowerCase().split(/[\s,;]+/).map((t) => t.replace(/^\*\./, "").replace(/\.$/, "")).filter(Boolean);
+// a scan matches when a target is the same domain/IP or one is a subdomain of the other
+const sameTarget = (a, b) => a === b || a.endsWith("." + b) || b.endsWith("." + a);
+const scanMatches = (scan, targets) => (scan.targets || []).some((t) => targets.some((c) => sameTarget(String(t).toLowerCase(), c)));
+function loadFreeScans() {
+  return fetch("/api/scans").then((r) => r.json()).then((scans) => {
+    FREE_SCANS = scans.filter((s) => !s.company && !s.running).sort((a, b) => (b.started_at || b.mtime) - (a.started_at || a.mtime));
+    return FREE_SCANS;
+  });
+}
+function renderScanPicker(box, targets, autoCheck) {
+  const keep = new Set([...box.querySelectorAll("input:checked")].map((x) => x.value));
+  box.innerHTML = "";
+  if (!FREE_SCANS.length) { box.appendChild(el("div", "muted", "No scans without a company.")); return; }
+  const list = splitTargets(targets);
+  const rows = FREE_SCANS.map((s) => ({ s, match: list.length > 0 && scanMatches(s, list) }))
+    .sort((a, b) => (b.match - a.match));
+  for (const { s, match } of rows) {
+    const lb = el("label"); const cb = el("input"); cb.type = "checkbox"; cb.value = s.name;
+    cb.checked = autoCheck ? match : keep.has(s.name);
+    lb.appendChild(cb);
+    const when = new Date((s.started_at || s.mtime) * 1000).toISOString().slice(0, 16).replace("T", " ");
+    lb.appendChild(document.createTextNode(`${s.name} · ${when} · ${(s.targets || []).join(", ") || "?"} · ${s.events} events`));
+    if (match) lb.appendChild(el("span", "chip in", "targets match"));
+    box.appendChild(lb);
+  }
+}
+const pickedScans = (box) => [...box.querySelectorAll("input:checked")].map((x) => x.value);
+
 let AT_COMPANY = null;
 function openAttach(c) {
   AT_COMPANY = c; $("#at-title").textContent = `Attach scans to ${c.name}`; $("#at-err").textContent = "";
-  const list = $("#at-list"); list.innerHTML = "Loading…";
-  fetch("/api/scans").then((r) => r.json()).then((scans) => {
-    list.innerHTML = "";
-    const free = scans.filter((s) => !s.company && !s.running);
-    if (!free.length) list.appendChild(el("div", "muted", "No unlinked scans."));
-    free.forEach((s) => { const lb = el("label"); const cb = el("input"); cb.type = "checkbox"; cb.value = s.name;
-      lb.appendChild(cb); lb.appendChild(document.createTextNode(`${s.name} · ${s.events} events · ${new Date(s.mtime * 1000).toISOString().slice(0, 10)}`)); list.appendChild(lb); });
-  });
+  $("#at-list").innerHTML = "Loading…";
+  loadFreeScans().then(() => renderScanPicker($("#at-list"), c.targets.join(" "), true));
   $("#dlg-attach").showModal();
 }
 $("#at-x").onclick = $("#at-cancel").onclick = () => $("#dlg-attach").close();

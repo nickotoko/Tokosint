@@ -64,7 +64,8 @@ Fixed or reworked, among others: `virustotal` (pagination), `shodan_idb` (API ke
   every later scan adds the valid findings the company did not have before.
 - **Companies** — name, targets, description, Telegram alert settings and the finding types to alert on; scheduled scans
   in cron format (`0 3 * * 1`, `*/30 9-18 * * mon-fri`, `@daily`) with a preview of the next runs; attaching existing
-  scans (the timeline is rebuilt in chronological order, without alerts); starting a scan for a company.
+  scans right when a company is created or later (scans whose targets match the company's are suggested; the timeline is
+  rebuilt in chronological order, without alerts); starting a scan for a company.
 - **Sources** — module metadata: input/output, API key, quotas, data freshness, health check result.
 - **Keys** — add, change and delete API keys (values are never sent back to the UI, only a mask).
 - **Telegram alerts** — after a company scan, one summary message, only when new valid findings of the company's alert
