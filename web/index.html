@@ -189,6 +189,7 @@
       <button class="btn primary" id="r-new">＋ New scan</button>
       <select id="r-scan"><option value="">— choose a scan —</option></select>
       <button class="btn" id="r-report" disabled>Source report</button>
+      <button class="btn" id="r-export" disabled>Export</button>
       <input type="search" id="r-q" placeholder="Search findings…" />
       <select id="r-type"><option value="">all types</option></select>
       <select id="r-source"><option value="">all sources</option></select>
@@ -237,7 +238,7 @@
       <span class="count" id="k-count"></span>
     </div>
     <div class="tablewrap"><table id="k-table"><thead><tr>
-      <th>Source</th><th>Field</th><th>Description</th><th>Key</th><th></th>
+      <th>Source</th><th>Description</th><th>Key</th><th></th>
     </tr></thead><tbody id="k-body"></tbody></table></div>
     <div class="count" style="margin-top:10px">Keys are stored in <code>config/secrets.yml</code> (mode 600) and are picked up
       by the next scan. Values are never sent back to the UI, only a mask.</div>
@@ -272,6 +273,37 @@
       <span class="err" id="scan-err"></span>
       <button class="btn" id="scan-cancel">Cancel</button>
       <button class="btn primary" id="scan-go">Start</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlg-export">
+  <div class="dlg-head"><h2>Export findings</h2><button class="x" id="exp-x">&times;</button></div>
+  <div class="dlg-body form">
+    <label for="exp-format">Format</label>
+    <select id="exp-format">
+      <option value="csv">CSV</option>
+      <option value="json">JSON</option>
+    </select>
+    <label for="exp-type">Findings</label>
+    <select id="exp-type"><option value="">full export (all types)</option></select>
+    <label for="exp-source">Source</label>
+    <select id="exp-source"><option value="">all sources</option></select>
+    <label for="exp-status">Validation status</label>
+    <select id="exp-status">
+      <option value="">any status</option>
+      <option value="valid">valid</option>
+      <option value="historical">historical</option>
+      <option value="false">false</option>
+      <option value="none">untagged</option>
+    </select>
+    <div class="hint" id="exp-count"></div>
+    <div class="hint">CSV: one row per finding, sources joined with “;”. JSON: full records with details,
+      discovery contexts and false reasons.</div>
+    <div class="actions">
+      <span class="err" id="exp-err"></span>
+      <button class="btn" id="exp-cancel">Cancel</button>
+      <button class="btn primary" id="exp-go">Download</button>
     </div>
   </div>
 </dialog>
@@ -454,6 +486,7 @@ function renderResults() {
   $("#r-count").textContent = `${rows.length} of ${ASSETS.length} findings`;
 }
 function loadScan(name) {
+  $("#r-export").disabled = true;
   if (!name) { ASSETS = []; renderResults(); return; }
   $("#r-empty").textContent = "Loading…"; $("#r-empty").hidden = false; $("#r-body").innerHTML = "";
   fetch("/api/scan/" + encodeURIComponent(name)).then((r) => r.json()).then((data) => {
@@ -469,6 +502,7 @@ function loadScan(name) {
       o.textContent = o.value ? `${o.dataset.label} (${cnt[o.value] || 0})` : o.dataset.label;
     }
     $("#r-empty").textContent = "No findings in this scan.";
+    $("#r-export").disabled = !ASSETS.length;
     renderResults();
   }).catch(() => { $("#r-empty").textContent = "Failed to load the scan."; });
 }
@@ -536,8 +570,8 @@ function renderKeys() {
     (!stt || (stt === "set" ? k.set : stt === "unset" ? !k.set : (k.mandatory && !k.set))));
   for (const k of rows) {
     const tr = el("tr");
-    tr.appendChild(el("td", "name", k.module));
-    tr.appendChild(el("td", "name", k.field));
+    // the field is almost always api_key; show it only when a module uses another name
+    tr.appendChild(el("td", "name", k.field === "api_key" ? k.module : `${k.module} · ${k.field}`));
     tr.appendChild(el("td", null, (k.desc || "—") + (k.mandatory ? " · required" : " · optional")));
     const tdV = el("td"); tdV.appendChild(el("span", "st " + (k.set ? "ok" : (k.mandatory ? "nokey" : "none")), k.set ? (k.masked || "set") : "not set"));
     tr.appendChild(tdV);
@@ -727,6 +761,67 @@ $("#r-report").onclick = () => {
   }).catch((e) => { $("#rep-body").innerHTML = ""; $("#rep-body").appendChild(el("div", "empty", "Failed to build the report: " + e.message)); });
 };
 $("#rep-x").onclick = () => $("#dlg-report").close();
+
+// ---------- export ----------
+const expFilter = () => {
+  const type = $("#exp-type").value, src = $("#exp-source").value, st = $("#exp-status").value;
+  return ASSETS.filter((a) => (!type || a.type === type) && (!src || a.sources.includes(src)) && (!st || (a.status || "none") === st));
+};
+const expCount = () => { const n = expFilter().length; $("#exp-count").textContent = `${n} of ${ASSETS.length} findings will be exported`; $("#exp-go").disabled = !n; };
+$("#r-export").onclick = () => {
+  const types = [...new Set(ASSETS.map((a) => a.type))].sort();
+  const sources = [...new Set(ASSETS.flatMap((a) => a.sources))].sort();
+  fillSelect($("#exp-type"), types); fillSelect($("#exp-source"), sources);
+  // start from the current table filters
+  $("#exp-type").value = $("#r-type").value; $("#exp-source").value = $("#r-source").value; $("#exp-status").value = $("#r-status").value;
+  $("#exp-err").textContent = ""; expCount();
+  $("#dlg-export").showModal();
+};
+["exp-type", "exp-source", "exp-status"].forEach((id) => { $("#" + id).oninput = expCount; });
+$("#exp-x").onclick = $("#exp-cancel").onclick = () => $("#dlg-export").close();
+
+const isoSeen = (ts) => ts ? new Date(ts * 1000).toISOString() : "";
+const csvCell = (v) => { const t = v == null ? "" : String(v); return /[",\n\r;]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+const EXPORT_COLUMNS = [
+  ["type", (a) => a.type],
+  ["finding", (a) => a.data],
+  ["status", (a) => a.status || "untagged"],
+  ["third_party", (a) => isThird(a) ? "yes" : ""],
+  ["dns_check", (a) => dnsCheckOf(a) || ""],
+  // only for false findings: a valid finding may also have been dropped on other discovery paths (kept in JSON)
+  ["false_reason", (a) => a.status === "false" ? (a.false_reasons || []).map((r) => `${r.module}: ${r.reason}`).join(" | ") : ""],
+  ["sources", (a) => a.sources.join(";")],
+  ["source_count", (a) => a.sources.length],
+  ["last_seen", (a) => isoSeen(a.seen)],
+  ["description", (a) => (a.details || {}).description || ""],
+  ["severity", (a) => (a.details || {}).severity || ""],
+  ["tags", (a) => (a.tags || []).join(";")],
+];
+function download(name, mime, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: mime }));
+  const link = el("a"); link.href = url; link.download = name;
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+$("#exp-go").onclick = () => {
+  const rows = expFilter(), fmt = $("#exp-format").value, scan = $("#r-scan").value || "scan";
+  const parts = [scan, $("#exp-type").value || "all", $("#exp-source").value, $("#exp-status").value].filter(Boolean);
+  const base = parts.join("_").replace(/[^a-zA-Z0-9_.-]+/g, "-");
+  if (fmt === "json") {
+    const records = rows.map((a) => ({ type: a.type, finding: a.data, status: a.status || "untagged", third_party: isThird(a),
+      dns_check: dnsCheckOf(a), sources: a.sources, last_seen: isoSeen(a.seen) || null, details: a.details || {},
+      discovery: a.contexts || [], false_reasons: a.false_reasons || [], tags: a.tags || [] }));
+    const doc = { scan, exported_at: new Date().toISOString(),
+      filters: { type: $("#exp-type").value || null, source: $("#exp-source").value || null, status: $("#exp-status").value || null },
+      count: records.length, findings: records };
+    download(base + ".json", "application/json", JSON.stringify(doc, null, 2));
+  } else {
+    const lines = [EXPORT_COLUMNS.map(([h]) => h).join(",")].concat(rows.map((a) => EXPORT_COLUMNS.map(([, f]) => csvCell(f(a))).join(",")));
+    // BOM so that spreadsheet apps open UTF-8 correctly
+    download(base + ".csv", "text/csv;charset=utf-8", "\ufeff" + lines.join("\r\n") + "\r\n");
+  }
+  $("#dlg-export").close();
+};
 </script>
 </body>
 </html>

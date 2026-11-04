@@ -59,6 +59,7 @@ Fixed or reworked, among others: `virustotal` (pagination), `shodan_idb` (API ke
 - **Analysis** — start scans, list scans, findings with their status (valid / historical / false with the reason),
   DNS check and third-party tag; filters, sorting, a details card with the discovery context;
   a per-source report (what each source found and how much, which sources did not start and why).
+  Export to CSV or JSON: the full scan or one finding type, filtered by source and validation status.
 - **Sources** — module metadata: input/output, API key, quotas, data freshness, health check result.
 - **Keys** — add, change and delete API keys (values are never sent back to the UI, only a mask).
 
