@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Запуск форка BBoT с изолированным проектным конфигом и папкой сканов.
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export BBOT_CONFIG_DIR="$ROOT/config"
+exec "$ROOT/bbot/.venv/bin/bbot" -o "$ROOT/scans" "$@"

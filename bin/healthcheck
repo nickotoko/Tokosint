@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Разовый хелчек источников: проверяет их эндпоинты и пишет web/health.json.
+# Сервер bin/web делает то же раз в сутки автоматически.
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export BBOT_CONFIG_DIR="$ROOT/config"
+exec "$ROOT/bbot/.venv/bin/python" "$ROOT/web/health.py"

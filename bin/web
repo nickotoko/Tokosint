@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Веб-интерфейс тулкита: источники (метаданные BBoT) и результаты сканов из scans/.
+#   bin/web [порт]   поднять локальный бэкенд (по умолчанию 8777), только на 127.0.0.1
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export BBOT_CONFIG_DIR="$ROOT/config"
+exec "$ROOT/bbot/.venv/bin/python" "$ROOT/web/server.py" "${1:-8777}"

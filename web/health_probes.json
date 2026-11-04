@@ -1,0 +1,15 @@
+{
+  "_comment": "Модули без внешнего эндпоинта (DNS/локальная логика) — глубокий хелчек их не запрашивает, статус local.",
+  "affiliates": null,
+  "asn": null,
+  "bucket_file_enum": null,
+  "code_repository": null,
+  "http": null,
+  "kreuzberg": null,
+  "pgp": null,
+  "portfilter": null,
+  "related_domains": null,
+  "social": null,
+  "speculate": null,
+  "trufflehog": null
+}

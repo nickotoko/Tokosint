@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# Перенос модулей BBoT между активным набором и архивом.
+#   bin/module restore <name>...   вернуть из bbot/modules_archive (код + тест + ключ)
+#   bin/module archive <name>...   убрать в архив (код + тест + ключ)
+#   bin/module key <name> <key>    записать API-ключ модуля (в secrets.yml или secrets.pending.yml — где модуль сейчас)
+#   bin/module list                показать активные и архивные модули
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO="$ROOT/bbot"
+ACTIVE="bbot/modules"
+ARCHIVE="modules_archive/modules"
+TESTS_ACTIVE="bbot/test/test_step_2/module_tests"
+TESTS_ARCHIVE="modules_archive/tests"
+cd "$REPO"
+
+# путь модуля относительно корня modules/: name.py | internal/name.py | output/name.py | report/name.py | name/ (пакет)
+find_module() { # $1 = base dir, $2 = name
+  local p
+  for p in "$2.py" "internal/$2.py" "output/$2.py" "report/$2.py" "$2"; do
+    if [ -e "$1/$p" ]; then echo "$p"; return 0; fi
+  done
+  return 1
+}
+
+secrets() { # move <from> <to> <name> | set <file> <name> <key>
+  "$REPO/.venv/bin/python" -I - "$ROOT/config" "$@" <<'EOF'
+import os, sys, yaml
+
+config_dir, op, *args = sys.argv[1:]
+
+
+def load(path):
+    """Returns (header comment lines, parsed yaml)."""
+    if not os.path.exists(path):
+        return "", {}
+    text = open(path).read()
+    header = "".join(l for l in text.splitlines(keepends=True) if l.startswith("#"))
+    return header, yaml.safe_load(text) or {}
+
+
+def save(path, header, data):
+    with open(path, "w") as f:
+        f.write(header + yaml.safe_dump(data, sort_keys=False, allow_unicode=True))
+    os.chmod(path, 0o600)
+
+
+if op == "move":
+    src, dst, name = os.path.join(config_dir, args[0]), os.path.join(config_dir, args[1]), args[2]
+    src_header, s = load(src)
+    dst_header, d = load(dst)
+    block = (s.get("modules") or {}).pop(name, None)
+    if block is not None:
+        d.setdefault("modules", {})[name] = block
+        save(src, src_header, s)
+        save(dst, dst_header, d)
+        print(f"  ключ {name}: {os.path.basename(src)} -> {os.path.basename(dst)}")
+elif op == "set":
+    path, name, key = os.path.join(config_dir, args[0]), args[1], args[2]
+    header, d = load(path)
+    d.setdefault("modules", {}).setdefault(name, {})["api_key"] = key
+    save(path, header, d)
+    print(f"  ключ {name} записан в {os.path.basename(path)}")
+EOF
+}
+
+move() { # $1 = restore|archive, $2 = name
+  local from to tfrom tto sfrom sto rel
+  if [ "$1" = restore ]; then
+    from=$ARCHIVE; to=$ACTIVE; tfrom=$TESTS_ARCHIVE; tto=$TESTS_ACTIVE; sfrom=secrets.pending.yml; sto=secrets.yml
+  else
+    from=$ACTIVE; to=$ARCHIVE; tfrom=$TESTS_ACTIVE; tto=$TESTS_ARCHIVE; sfrom=secrets.yml; sto=secrets.pending.yml
+  fi
+  rel=$(find_module "$from" "$2") || { echo "модуль $2 не найден в $from" >&2; return 1; }
+  mkdir -p "$(dirname "$to/$rel")"
+  git mv "$from/$rel" "$to/$rel"
+  echo "$1: $2 ($rel)"
+  local t="$tfrom/test_module_$2.py"
+  if [ -f "$t" ]; then git mv "$t" "$tto/" && echo "  тест $(basename "$t")"; fi
+  secrets move "$sfrom" "$sto" "$2"
+}
+
+case "${1:-}" in
+  restore|archive) cmd=$1; shift; for n in "$@"; do move "$cmd" "$n"; done ;;
+  key)
+    [ $# -eq 3 ] || { sed -n 2,6p "$0"; exit 1; }
+    if find_module "$ACTIVE" "$2" >/dev/null; then f=secrets.yml
+    elif find_module "$ARCHIVE" "$2" >/dev/null; then f=secrets.pending.yml
+    else echo "модуль $2 не найден" >&2; exit 1; fi
+    secrets set "$f" "$2" "$3" ;;
+  list)
+    echo "active:";  (cd $ACTIVE && ls *.py internal/*.py output/*.py report/*.py 2>/dev/null | grep -vE '(^|/)(__init__|base)\.py$' | sed 's/\.py$//' | tr '\n' ' '); echo
+    echo "archive:"; (cd $ARCHIVE && ls -p . internal output report 2>/dev/null | grep -vE ':$|^$|/$' | sed 's/\.py$//' | sort | tr '\n' ' '); echo ;;
+  *) sed -n 2,6p "$0"; exit 1 ;;
+esac

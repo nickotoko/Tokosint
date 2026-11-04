@@ -1,0 +1,31 @@
+# данные реальных целей и результаты сканов
+scans/
+docs/private/
+*.xlsx
+
+# ключи API
+config/secrets.yml
+config/secrets.pending.yml
+
+# история форка bbot (upstream) и сторонние клоны
+.bbot-upstream.git/
+theHarvester/
+
+# окружение и мусор
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+pytest_debug.log
+.coverage*
+
+# генерируемый результат хелчека
+web/health.json
+
+# артефакты тестов и временные файлы
+web/.benchmarks/
+*.tmp
+.ruff_cache/
+.pytest_cache/
+CLAUDE.md
+.claude/

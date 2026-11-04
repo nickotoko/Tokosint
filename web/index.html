@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Tokosint</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f6f7f9; --panel: #fff; --ink: #1b1f24; --muted: #6b7482;
+    --line: #e3e7ec; --accent: #2d6cdf; --accent-weak: #e8f0ff;
+    --chip: #eef1f5; --in: #0a7d55; --out: #9a4b16; --warn: #b4690e;
+    --row: #fafbfc;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #14171b; --panel: #1b1f24; --ink: #e8ebef; --muted: #98a2b0;
+      --line: #2a2f37; --accent: #5b8def; --accent-weak: #1e2a44;
+      --chip: #262b32; --in: #3fc38a; --out: #d98a52; --warn: #e0a64a; --row: #1f242a;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #14171b; --panel: #1b1f24; --ink: #e8ebef; --muted: #98a2b0;
+    --line: #2a2f37; --accent: #5b8def; --accent-weak: #1e2a44;
+    --chip: #262b32; --in: #3fc38a; --out: #d98a52; --warn: #e0a64a; --row: #1f242a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg); color: var(--ink); }
+  header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+    background: var(--panel); border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 18px; padding: 12px 20px; flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; font-weight: 650; }
+  nav { display: flex; gap: 4px; }
+  nav button { font: inherit; border: 0; background: transparent; color: var(--muted);
+    padding: 6px 14px; border-radius: 8px; cursor: pointer; }
+  nav button.on { background: var(--accent-weak); color: var(--accent); font-weight: 600; }
+  main { max-width: 1150px; margin: 0 auto; padding: 20px; }
+  .bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+  input[type=search], select { font: inherit; color: var(--ink); background: var(--panel);
+    border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
+  input[type=search] { flex: 1; min-width: 180px; }
+  .count { color: var(--muted); font-size: 13px; }
+  .tablewrap { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line);
+    vertical-align: top; font-size: 13px; }
+  th { color: var(--muted); font-weight: 600; user-select: none; position: sticky;
+    top: calc(env(safe-area-inset-top, 0px) + 54px); background: var(--panel); white-space: nowrap; }
+  th.sortable { cursor: pointer; } th.sortable:hover { color: var(--ink); }
+  tbody tr:nth-child(even) { background: var(--row); }
+  tbody tr.click { cursor: pointer; }
+  tbody tr.click:hover { background: var(--accent-weak); }
+  tr:last-child td { border-bottom: 0; }
+  td.name, td.data { font-family: var(--mono); word-break: break-all; }
+  td.data { max-width: 420px; }
+  td.seen { font-family: var(--mono); color: var(--muted); white-space: nowrap; font-size: 12.5px; }
+  .chip { display: inline-block; font-size: 11.5px; padding: 2px 8px; border-radius: 999px;
+    background: var(--chip); color: var(--muted); white-space: nowrap; margin: 1px 2px 1px 0; }
+  .chip.in { color: var(--in); } .chip.out { color: var(--out); }
+  .chip.flag { font-family: var(--mono); }
+  td.type .chip { color: var(--accent); background: var(--accent-weak); }
+  .yes { color: var(--warn); font-weight: 600; } .no { color: var(--muted); }
+  .st { display: inline-block; font-size: 12px; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+  .st::before { content: "● "; }
+  .st.ok { color: var(--in); background: color-mix(in srgb, var(--in) 14%, transparent); }
+  .st.valid { color: var(--in); background: color-mix(in srgb, var(--in) 14%, transparent); }
+  .st.false { color: #d64545; background: color-mix(in srgb, #d64545 14%, transparent); }
+  .st.historical { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+  .st.down { color: #d64545; background: color-mix(in srgb, #d64545 14%, transparent); }
+  .st.nokey, .st.nodata { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+  .st.local, .st.unknown, .st.none { color: var(--muted); background: var(--chip); }
+  .empty { text-align: center; color: var(--muted); padding: 60px 20px; }
+  dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--ink);
+    max-width: 520px; width: calc(100% - 32px); padding: 0; }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  .dlg-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px;
+    border-bottom: 1px solid var(--line); }
+  .dlg-head h2 { margin: 0; font-size: 17px; font-family: var(--mono); }
+  .dlg-body { padding: 16px 20px; }
+  .dlg-body dt { color: var(--muted); font-size: 12px; margin-top: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  .dlg-body dt:first-child { margin-top: 0; }
+  .dlg-body dd { margin: 4px 0 0; }
+  .x { border: 0; background: transparent; color: var(--muted); font-size: 22px; cursor: pointer; line-height: 1; }
+  .btn { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    border-radius: 8px; padding: 7px 12px; cursor: pointer; white-space: nowrap; }
+  .btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover:not(:disabled) { color: #fff; filter: brightness(1.08); }
+  .btn.danger:hover:not(:disabled) { border-color: #d64545; color: #d64545; }
+  dialog.wide { max-width: 1000px; }
+  .job { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; }
+  .job-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .job-head .grow { flex: 1; }
+  .job pre { margin: 10px 0 0; font: 12px/1.45 var(--mono); color: var(--muted); white-space: pre-wrap;
+    word-break: break-all; max-height: 190px; overflow: auto; background: var(--row); border-radius: 8px; padding: 8px 10px; }
+  .spin { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--accent);
+    animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  .form label { display: block; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; margin: 14px 0 5px; }
+  .form label:first-child { margin-top: 0; }
+  .form textarea, .form input[type=text] { width: 100%; font: 13px/1.5 var(--mono); color: var(--ink); background: var(--panel);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .form textarea { min-height: 96px; resize: vertical; }
+  .form .hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .srcgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2px 10px;
+    max-height: 220px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-top: 6px; }
+  .srcgrid label { display: flex; gap: 6px; align-items: center; margin: 0; text-transform: none; letter-spacing: 0;
+    font: 12.5px var(--mono); color: var(--ink); cursor: pointer; }
+  .form .actions { display: flex; gap: 10px; justify-content: flex-end; align-items: center; margin-top: 18px; }
+  .form .err { color: #d64545; font-size: 13px; margin-right: auto; }
+  td.data .desc { font-family: system-ui, sans-serif; margin-top: 3px; word-break: normal; }
+  .chip.sev { margin-top: 4px; font-weight: 600; }
+  .chip.sev.high, .chip.sev.critical { color: #d64545; } .chip.sev.medium { color: var(--warn); }
+  .ctx { font-size: 12.5px; margin: 4px 0; } .ctx b { font-family: var(--mono); font-weight: 600; }
+  .keyform { display: flex; gap: 6px; } .keyform input { font: 12.5px var(--mono); padding: 5px 8px; border: 1px solid var(--line);
+    border-radius: 7px; background: var(--panel); color: var(--ink); min-width: 220px; }
+  .btn.sm { padding: 4px 10px; font-size: 12.5px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .kpi { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .kpi .v { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .kpi .k { color: var(--muted); font-size: 12px; }
+  .rep-meta { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+  .rep-meta b { color: var(--ink); font-weight: 600; font-family: var(--mono); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  th.num { text-align: right; }
+  .muted { color: var(--muted); }
+  .chip b { color: var(--ink); font-weight: 600; margin-left: 3px; }
+  .st.failed, .st.error { color: #d64545; background: color-mix(in srgb, #d64545 14%, transparent); }
+  a.theme { margin-left: auto; color: var(--muted); cursor: pointer; font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Tokosint</h1>
+  <nav>
+    <button id="tab-results" class="on">Анализ</button>
+    <button id="tab-sources">Источники</button>
+    <button id="tab-keys">Ключи</button>
+  </nav>
+  <a class="theme" id="theme">тема</a>
+</header>
+<main>
+  <section id="view-sources" hidden>
+    <div class="bar">
+      <input type="search" id="s-q" placeholder="Поиск по имени и описанию…" />
+      <select id="s-flag"><option value="">все флаги</option></select>
+      <select id="s-event"><option value="">любое событие (вход/выход)</option></select>
+      <select id="s-auth">
+        <option value="">ключ: любой</option>
+        <option value="no">без ключа</option>
+        <option value="yes">нужен ключ</option>
+      </select>
+      <select id="s-status">
+        <option value="">статус: любой</option>
+        <option value="ok">отдаёт данные</option>
+        <option value="nodata">без данных</option>
+        <option value="down">не работает</option>
+        <option value="nokey">нет ключа</option>
+        <option value="local">локальный</option>
+      </select>
+      <select id="s-fresh">
+        <option value="">актуальность: любая</option>
+        <option value="current">актуальные данные</option>
+        <option value="historical">исторические данные</option>
+        <option value="inherit">производные</option>
+      </select>
+      <span class="count" id="s-count"></span>
+    </div>
+    <div class="tablewrap"><table id="s-table"><thead><tr>
+      <th class="sortable" data-k="name">Источник</th>
+      <th>Данные на вход</th>
+      <th>Данные на выход</th>
+      <th class="sortable" data-k="auth_required">Ключ</th>
+      <th class="sortable" data-k="freshness">Актуальность</th>
+      <th class="sortable" data-k="status">Статус</th>
+    </tr></thead><tbody id="s-body"></tbody></table></div>
+    <div class="count" id="s-health" style="margin-top:10px"></div>
+  </section>
+
+  <section id="view-results">
+    <div class="bar">
+      <button class="btn primary" id="r-new">＋ Новый скан</button>
+      <select id="r-scan"><option value="">— выберите скан —</option></select>
+      <button class="btn" id="r-report" disabled>Отчёт по источникам</button>
+      <input type="search" id="r-q" placeholder="Поиск по активу…" />
+      <select id="r-type"><option value="">все типы</option></select>
+      <select id="r-source"><option value="">все источники</option></select>
+      <select id="r-status">
+        <option value="">статус: любой</option>
+        <option value="valid">валидные</option>
+        <option value="historical">исторические</option>
+        <option value="false">ложные</option>
+        <option value="none">без разметки</option>
+      </select>
+      <select id="r-owner">
+        <option value="">принадлежность: любая</option>
+        <option value="own">активы цели</option>
+        <option value="third">третья сторона</option>
+      </select>
+      <span class="count" id="r-count"></span>
+    </div>
+    <div class="job" id="r-job" hidden>
+      <div class="job-head">
+        <span class="spin" id="job-spin"></span>
+        <span class="grow" id="job-title"></span>
+        <button class="btn" id="job-open" hidden>Открыть результаты</button>
+        <button class="btn danger" id="job-stop">Остановить</button>
+        <button class="x" id="job-hide" title="Скрыть" hidden>&times;</button>
+      </div>
+      <pre id="job-log"></pre>
+    </div>
+    <div class="tablewrap"><table id="r-table"><thead><tr>
+      <th class="sortable" data-k="type">Тип актива</th>
+      <th class="sortable" data-k="data">Актив</th>
+      <th class="sortable" data-k="nsources">Источники</th>
+      <th class="sortable" data-k="status">Статус</th>
+      <th class="sortable" data-k="seen">Наблюдался</th>
+    </tr></thead><tbody id="r-body"></tbody></table></div>
+    <div class="empty" id="r-empty">Выберите скан, чтобы увидеть активы.</div>
+  </section>
+  <section id="view-keys" hidden>
+    <div class="bar">
+      <input type="search" id="k-q" placeholder="Поиск по источнику…" />
+      <select id="k-state">
+        <option value="">все</option>
+        <option value="set">заданные</option>
+        <option value="unset">не заданные</option>
+        <option value="need">обязательные, но не заданные</option>
+      </select>
+      <span class="count" id="k-count"></span>
+    </div>
+    <div class="tablewrap"><table id="k-table"><thead><tr>
+      <th>Источник</th><th>Поле</th><th>Описание</th><th>Ключ</th><th></th>
+    </tr></thead><tbody id="k-body"></tbody></table></div>
+    <div class="count" style="margin-top:10px">Ключи хранятся в <code>config/secrets.yml</code> (права 600) и подхватываются
+      при следующем запуске скана. Значения в интерфейс не возвращаются — видна только маска.</div>
+  </section>
+</main>
+
+<dialog id="dlg">
+  <div class="dlg-head"><h2 id="dlg-name"></h2><button class="x" id="dlg-x">&times;</button></div>
+  <div class="dlg-body" id="dlg-body"></div>
+</dialog>
+
+<dialog id="dlg-scan">
+  <div class="dlg-head"><h2>Новый скан</h2><button class="x" id="scan-x">&times;</button></div>
+  <div class="dlg-body form">
+    <label for="scan-targets">Цели</label>
+    <textarea id="scan-targets" placeholder="target.example&#10;related.example&#10;198.51.100.0/24"></textarea>
+    <div class="hint">Домены, IP или подсети — по одной на строку (или через пробел/запятую), до 20.</div>
+    <label for="scan-name">Имя скана</label>
+    <input type="text" id="scan-name" placeholder="по умолчанию — первая цель и время" />
+    <div class="hint">Латиница в нижнем регистре, цифры, _ и -. Результаты — в <code>scans/&lt;имя&gt;/</code>.</div>
+    <label for="scan-mode">Источники</label>
+    <select id="scan-mode">
+      <option value="all">весь пассивный набор (-f passive)</option>
+      <option value="pick">выбрать источники</option>
+    </select>
+    <div id="scan-pick" hidden>
+      <div class="srcgrid" id="scan-sources"></div>
+      <div class="hint" id="scan-pick-count"></div>
+    </div>
+    <div class="hint">Запросы идут к сторонним источникам и тратят их квоты. Одновременно — один скан.</div>
+    <div class="actions">
+      <span class="err" id="scan-err"></span>
+      <button class="btn" id="scan-cancel">Отмена</button>
+      <button class="btn primary" id="scan-go">Запустить</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlg-report" class="wide">
+  <div class="dlg-head"><h2 id="rep-name"></h2><button class="x" id="rep-x">&times;</button></div>
+  <div class="dlg-body" id="rep-body"></div>
+</dialog>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const el = (t, cls, txt) => { const e = document.createElement(t); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+const chips = (td, items, cls) => (items.length ? items : ["—"]).forEach((x) => td.appendChild(el("span", "chip " + (cls || ""), x)));
+
+// ---- тема ----
+$("#theme").onclick = () => {
+  const r = document.documentElement, cur = r.getAttribute("data-theme");
+  const next = cur === "dark" ? "light" : cur === "light" ? "" : "dark";
+  if (next) r.setAttribute("data-theme", next); else r.removeAttribute("data-theme");
+  try { localStorage.setItem("theme", next); } catch (e) {}
+};
+try { const t = localStorage.getItem("theme"); if (t) document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+
+// ---- вкладки ----
+function show(which) {
+  for (const v of ["results", "sources", "keys"]) {
+    $("#view-" + v).hidden = v !== which;
+    $("#tab-" + v).classList.toggle("on", v === which);
+  }
+  if (which === "keys") loadKeys();
+}
+$("#tab-results").onclick = () => show("results");
+$("#tab-sources").onclick = () => show("sources");
+$("#tab-keys").onclick = () => show("keys");
+
+function fillSelect(sel, values, keepFirst = true) {
+  while (sel.options.length > (keepFirst ? 1 : 0)) sel.remove(sel.options.length - 1);
+  for (const v of values) { const o = el("option", null, v); o.value = v; sel.appendChild(o); }
+}
+
+// ================= ИСТОЧНИКИ =================
+let SOURCES = [], HEALTH = {}, sSort = { k: "name", dir: 1 };
+const ST_LABEL = { ok: "отдаёт данные", nodata: "без данных", down: "не работает", nokey: "нет ключа", local: "локальный", unknown: "—", none: "—" };
+const FRESH_LABEL = { current: "актуальные", historical: "исторические", inherit: "производные" };
+const FRESH_CLS = { current: "valid", historical: "historical", inherit: "local" };
+const statusOf = (name) => (HEALTH[name] && HEALTH[name].status) || "none";
+function renderSources() {
+  const q = $("#s-q").value.trim().toLowerCase();
+  const flag = $("#s-flag").value, ev = $("#s-event").value, auth = $("#s-auth").value, st = $("#s-status").value, fr = $("#s-fresh").value;
+  const body = $("#s-body"); body.innerHTML = "";
+  const rows = SOURCES.filter((s) =>
+    (!q || s.name.toLowerCase().includes(q) || (s.description || "").toLowerCase().includes(q)) &&
+    (!flag || s.flags.includes(flag)) &&
+    (!ev || s.watched_events.includes(ev) || s.produced_events.includes(ev)) &&
+    (auth !== "no" || !s.auth_required) && (auth !== "yes" || s.auth_required) &&
+    (!st || statusOf(s.name) === st) && (!fr || s.freshness === fr));
+  rows.sort((a, b) => {
+    const k = sSort.k; let x = a[k], y = b[k];
+    if (k === "auth_required") { x = x ? 1 : 0; y = y ? 1 : 0; }
+    else if (k === "status") { x = statusOf(a.name); y = statusOf(b.name); }
+    return (x < y ? -1 : x > y ? 1 : 0) * sSort.dir || a.name.localeCompare(b.name);
+  });
+  for (const s of rows) {
+    const tr = el("tr", "click");
+    tr.appendChild(el("td", "name", s.name));
+    const tdIn = el("td"); chips(tdIn, s.watched_events, "in"); tr.appendChild(tdIn);
+    const tdOut = el("td"); chips(tdOut, s.produced_events, "out"); tr.appendChild(tdOut);
+    const tdA = el("td"); tdA.appendChild(el("span", s.auth_required ? "yes" : "no", s.auth_required ? "🔑 нужен" : "нет")); tr.appendChild(tdA);
+    const tdF = el("td"); tdF.appendChild(el("span", "st " + (FRESH_CLS[s.freshness] || ""), FRESH_LABEL[s.freshness] || "—")); tr.appendChild(tdF);
+    const stt = statusOf(s.name); const tdS = el("td"); tdS.appendChild(el("span", "st " + stt, ST_LABEL[stt] || stt)); tr.appendChild(tdS);
+    tr.onclick = () => openSource(s);
+    body.appendChild(tr);
+  }
+  $("#s-count").textContent = `${rows.length} из ${SOURCES.length}`;
+}
+function openSource(s) {
+  $("#dlg-name").textContent = s.name;
+  const b = $("#dlg-body"); b.innerHTML = "";
+  const dl = el("dl");
+  const dd = (node) => { dl.appendChild(node); };
+  const row = (k, v) => { dl.appendChild(el("dt", null, k)); dl.appendChild(el("dd", null, v)); };
+  row("Описание", s.description || "—");
+  dl.appendChild(el("dt", null, "Данные на вход")); { const d = el("dd"); chips(d, s.watched_events, "in"); dd(d); }
+  dl.appendChild(el("dt", null, "Данные на выход")); { const d = el("dd"); chips(d, s.produced_events, "out"); dd(d); }
+  dl.appendChild(el("dt", null, "Флаги")); { const d = el("dd"); chips(d, s.flags, "flag"); dd(d); }
+  row("Нужен API-ключ", s.auth_required ? "да" : "нет");
+  row("Актуальность данных", FRESH_LABEL[s.freshness] || "не указана");
+  const h = HEALTH[s.name];
+  if (h) {
+    const d = el("dd"); d.appendChild(el("span", "st " + h.status, ST_LABEL[h.status] || h.status));
+    if (h.detail) d.appendChild(document.createTextNode(" " + h.detail));
+    dl.appendChild(el("dt", null, "Статус (хелчек)")); dl.appendChild(d);
+    if (h.checked_at) row("Проверено", new Date(h.checked_at * 1000).toLocaleString());
+  }
+  row("Квоты / лимиты", s.quota || "не задокументированы");
+  if (s.author) row("Автор", s.author);
+  b.appendChild(dl);
+  $("#dlg").showModal();
+}
+$("#dlg-x").onclick = () => $("#dlg").close();
+["s-q", "s-flag", "s-event", "s-auth", "s-status", "s-fresh"].forEach((id) => { $("#" + id).oninput = renderSources; });
+document.querySelectorAll("#s-table th.sortable").forEach((th) => th.onclick = () => {
+  const k = th.dataset.k; sSort.dir = (sSort.k === k) ? -sSort.dir : 1; sSort.k = k; renderSources();
+});
+
+function loadHealth() {
+  return fetch("/api/health").then((r) => r.json()).then((h) => {
+    HEALTH = h.sources || {};
+    const ago = h.checked_at ? new Date(h.checked_at * 1000).toLocaleString() : "ещё не проверялось";
+    const c = {}; Object.values(HEALTH).forEach((r) => { c[r.status] = (c[r.status] || 0) + 1; });
+    const parts = Object.entries(c).map(([k, v]) => `${ST_LABEL[k] || k}: ${v}`).join(" · ");
+    $("#s-health").textContent = `Хелчек: ${ago}${parts ? " — " + parts : ""}`;
+  }).catch(() => {});
+}
+fetch("/api/sources").then((r) => r.json()).then((data) => {
+  SOURCES = data;
+  const flags = new Set(), events = new Set();
+  data.forEach((s) => { s.flags.forEach((f) => flags.add(f)); s.watched_events.concat(s.produced_events).forEach((e) => e !== "*" && events.add(e)); });
+  fillSelect($("#s-flag"), [...flags].sort());
+  fillSelect($("#s-event"), [...events].sort());
+  renderSources();
+  loadHealth().then(renderSources);
+}).catch(() => { $("#s-body").innerHTML = '<tr><td colspan="6" class="empty">Нет данных. Запусти через <code>bin/web</code>.</td></tr>'; });
+
+// ================= РЕЗУЛЬТАТЫ =================
+// по умолчанию — от активов с бОльшим числом источников к меньшему
+let ASSETS = [], rSort = { k: "nsources", dir: -1 };
+const IOC_LABEL = { valid: "валидно", historical: "исторически", false: "ложно" };
+const DNS_LABEL = { ok: "резолвится", nxdomain: "не резолвится", dangling: "висячий CNAME", wildcard: "wildcard", error: "ошибка DNS" };
+const dnsCheckOf = (a) => { const t = (a.tags || []).find((x) => x.startsWith("dns-check-")); return t ? t.slice(10) : null; };
+const isThird = (a) => (a.tags || []).includes("third-party");
+const IOC_RANK = { valid: 2, historical: 1, false: 0.5 };
+const sortKey = (a, k) => k === "nsources" ? a.sources.length : k === "seen" ? (a.seen || 0) : k === "status" ? (IOC_RANK[a.status] || 0) : a[k];
+const fmtSeen = (ts) => {
+  if (!ts) return "—";
+  const d = new Date(ts * 1000);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+function renderResults() {
+  const body = $("#r-body"), empty = $("#r-empty");
+  if (!ASSETS.length) { body.innerHTML = ""; empty.hidden = false; $("#r-count").textContent = ""; return; }
+  empty.hidden = true;
+  const q = $("#r-q").value.trim().toLowerCase(), type = $("#r-type").value, src = $("#r-source").value, rst = $("#r-status").value, own = $("#r-owner").value;
+  const rows = ASSETS.filter((a) =>
+    (!q || a.data.toLowerCase().includes(q)) && (!type || a.type === type) && (!src || a.sources.includes(src)) &&
+    (!rst || (a.status || "none") === rst) &&
+    (!own || (own === "third") === isThird(a)));
+  rows.sort((a, b) => {
+    const x = sortKey(a, rSort.k), y = sortKey(b, rSort.k);
+    return ((x < y ? -1 : x > y ? 1 : 0) * rSort.dir) || (b.sources.length - a.sources.length) || a.data.localeCompare(b.data);
+  });
+  body.innerHTML = "";
+  for (const a of rows) {
+    const tr = el("tr");
+    const tdT = el("td", "type"); tdT.appendChild(el("span", "chip", a.type)); tr.appendChild(tdT);
+    const tdD = el("td", "data", a.data);
+    const desc = a.details && a.details.description;
+    if (desc) { const d = el("div", "muted desc", desc.length > 220 ? desc.slice(0, 220) + "…" : desc); tdD.appendChild(d); }
+    if (a.details && a.details.severity) tdD.appendChild(el("span", "chip sev " + a.details.severity.toLowerCase(), a.details.severity));
+    tr.appendChild(tdD);
+    const tdS = el("td"); chips(tdS, a.sources); tr.appendChild(tdS);
+    const tdV = el("td"); tdV.appendChild(el("span", "st " + (a.status || "none"), IOC_LABEL[a.status] || "—"));
+    const dc = dnsCheckOf(a); if (dc && dc !== "ok") tdV.appendChild(el("div", "muted", DNS_LABEL[dc] || dc));
+    if (a.status === "false" && a.false_reasons && a.false_reasons.length) {
+      const fr = a.false_reasons[0];
+      tdV.appendChild(el("div", "muted", (fr.hidden ? "скрыто: " : "") + fr.reason));
+    }
+    if (isThird(a)) { const t = el("div", "muted", "третья сторона"); t.title = "провайдер из DNS-записей цели: связь актуальна, но это не актив цели"; tdV.appendChild(t); }
+    tr.appendChild(tdV);
+    const tdSeen = el("td", "seen", fmtSeen(a.seen)); tr.appendChild(tdSeen);
+    tr.className = "click"; tr.onclick = () => openAsset(a);
+    body.appendChild(tr);
+  }
+  $("#r-count").textContent = `${rows.length} из ${ASSETS.length} активов`;
+}
+function loadScan(name) {
+  if (!name) { ASSETS = []; renderResults(); return; }
+  $("#r-empty").textContent = "Загрузка…"; $("#r-empty").hidden = false; $("#r-body").innerHTML = "";
+  fetch("/api/scan/" + encodeURIComponent(name)).then((r) => r.json()).then((data) => {
+    if (data.error) throw new Error(data.error);
+    ASSETS = data.map((a) => ({ ...a, data: String(a.data) }));
+    const types = new Set(), sources = new Set();
+    ASSETS.forEach((a) => { types.add(a.type); a.sources.forEach((s) => sources.add(s)); });
+    fillSelect($("#r-type"), [...types].sort());
+    fillSelect($("#r-source"), [...sources].sort());
+    const cnt = {}; ASSETS.forEach((a) => { const k = a.status || "none"; cnt[k] = (cnt[k] || 0) + 1; });
+    for (const o of $("#r-status").options) {
+      if (!o.dataset.label) o.dataset.label = o.textContent;
+      o.textContent = o.value ? `${o.dataset.label} (${cnt[o.value] || 0})` : o.dataset.label;
+    }
+    $("#r-empty").textContent = "Нет активов в этом скане.";
+    renderResults();
+  }).catch(() => { $("#r-empty").textContent = "Не удалось загрузить скан."; });
+}
+$("#r-scan").onchange = () => loadScan($("#r-scan").value);
+["r-q", "r-type", "r-source", "r-status", "r-owner"].forEach((id) => { $("#" + id).oninput = renderResults; });
+document.querySelectorAll("#r-table th.sortable").forEach((th) => th.onclick = () => {
+  const k = th.dataset.k; rSort.dir = (rSort.k === k) ? -rSort.dir : 1; rSort.k = k; renderResults();
+});
+
+function loadScanList(select) {
+  return fetch("/api/scans").then((r) => r.json()).then((scans) => {
+    const sel = $("#r-scan"), cur = select || sel.value;
+    while (sel.options.length > 1) sel.remove(1);
+    for (const s of scans) {
+      const d = new Date(s.mtime * 1000).toISOString().slice(0, 10);
+      const o = el("option", null, `${s.name} · ${s.events} событий · ${d}${s.running ? " · идёт" : ""}`);
+      o.value = s.name; sel.appendChild(o);
+    }
+    if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
+    $("#r-report").disabled = !sel.value;
+    if (!scans.length && !ASSETS.length) $("#r-empty").textContent = "В scans/ нет сканов. Запустите новый.";
+  }).catch(() => { $("#r-empty").textContent = "Не удалось получить список сканов."; });
+}
+loadScanList();
+$("#r-scan").addEventListener("change", () => { $("#r-report").disabled = !$("#r-scan").value; });
+
+// ---------- карточка актива ----------
+const DETAIL_LABEL = { description: "Описание", severity: "Критичность", confidence: "Уверенность", url: "URL", host: "Хост",
+  path: "Путь", name: "Название", platform: "Платформа", profile_name: "Профиль", technology: "Технология", asn: "ASN",
+  country: "Страна", city: "Город", subnet: "Подсеть" };
+function openAsset(a) {
+  $("#dlg-name").textContent = a.data.length > 80 ? a.data.slice(0, 80) + "…" : a.data;
+  const b = $("#dlg-body"); b.innerHTML = "";
+  const dl = el("dl");
+  const row = (k, v) => { dl.appendChild(el("dt", null, k)); const d = el("dd"); if (v instanceof Node) d.appendChild(v); else d.textContent = v; dl.appendChild(d); };
+  row("Тип", a.type);
+  const st = el("span"); st.appendChild(el("span", "st " + (a.status || "none"), IOC_LABEL[a.status] || "без разметки"));
+  const dc = dnsCheckOf(a); if (dc) st.appendChild(document.createTextNode(" DNS: " + (DNS_LABEL[dc] || dc)));
+  if (isThird(a)) st.appendChild(document.createTextNode(" · третья сторона"));
+  row("Статус", st);
+  if (a.false_reasons && a.false_reasons.length) {
+    const d = el("div"); a.false_reasons.forEach((r) => { const c = el("div", "ctx"); c.appendChild(el("b", null, r.module || "—"));
+      c.appendChild(document.createTextNode(": " + (r.hidden ? "скрыто — " : "отброшено — ") + r.reason)); d.appendChild(c); });
+    row("Почему ложное", d);
+  }
+  for (const [k, v] of Object.entries(a.details || {})) row(DETAIL_LABEL[k] || k, v);
+  { const d = el("div"); chips(d, a.sources); row("Источники", d); }
+  if (a.contexts && a.contexts.length) {
+    const d = el("div"); a.contexts.forEach((c) => { const x = el("div", "ctx"); x.appendChild(el("b", null, c.module || "—"));
+      x.appendChild(document.createTextNode(": " + c.context)); d.appendChild(x); });
+    row("Как найдено", d);
+  }
+  row("Наблюдался", fmtSeen(a.seen));
+  { const d = el("div"); chips(d, a.tags || [], "flag"); row("Теги", d); }
+  b.appendChild(dl);
+  $("#dlg").showModal();
+}
+
+// ---------- ключи API ----------
+let KEYS = [];
+function renderKeys() {
+  const q = $("#k-q").value.trim().toLowerCase(), stt = $("#k-state").value, body = $("#k-body");
+  body.innerHTML = "";
+  const rows = KEYS.filter((k) => (!q || k.module.includes(q)) &&
+    (!stt || (stt === "set" ? k.set : stt === "unset" ? !k.set : (k.mandatory && !k.set))));
+  for (const k of rows) {
+    const tr = el("tr");
+    tr.appendChild(el("td", "name", k.module));
+    tr.appendChild(el("td", "name", k.field));
+    tr.appendChild(el("td", null, (k.desc || "—") + (k.mandatory ? " · обязательный" : " · необязательный")));
+    const tdV = el("td"); tdV.appendChild(el("span", "st " + (k.set ? "ok" : (k.mandatory ? "nokey" : "none")), k.set ? (k.masked || "задан") : "не задан"));
+    tr.appendChild(tdV);
+    const tdA = el("td"); const form = el("div", "keyform");
+    const inp = el("input"); inp.type = "password"; inp.placeholder = k.set ? "новое значение" : "значение ключа"; inp.autocomplete = "off";
+    const save = el("button", "btn sm primary", k.set ? "Изменить" : "Добавить");
+    save.onclick = () => {
+      if (!inp.value.trim()) { inp.focus(); return; }
+      save.disabled = true;
+      postJSON("/api/keys/set", { module: k.module, field: k.field, value: inp.value })
+        .then((d) => { KEYS = d; renderKeys(); }).catch((e) => alert(e.message)).finally(() => { save.disabled = false; });
+    };
+    inp.onkeydown = (ev) => { if (ev.key === "Enter") save.click(); };
+    form.appendChild(inp); form.appendChild(save);
+    if (k.set) {
+      const del = el("button", "btn sm danger", "Удалить");
+      del.onclick = () => {
+        if (!confirm(`Удалить ключ ${k.module}.${k.field}?`)) return;
+        postJSON("/api/keys/delete", { module: k.module, field: k.field })
+          .then((d) => { KEYS = d; renderKeys(); }).catch((e) => alert(e.message));
+      };
+      form.appendChild(del);
+    }
+    tdA.appendChild(form); tr.appendChild(tdA);
+    body.appendChild(tr);
+  }
+  const set = KEYS.filter((k) => k.set).length;
+  $("#k-count").textContent = `${rows.length} из ${KEYS.length} · задано ${set}`;
+}
+function loadKeys() {
+  fetch("/api/keys").then((r) => r.json()).then((d) => { if (d.error) throw new Error(d.error); KEYS = d; renderKeys(); })
+    .catch((e) => { $("#k-body").innerHTML = ""; $("#k-count").textContent = "Не удалось загрузить ключи: " + e.message; });
+}
+["k-q", "k-state"].forEach((id) => { $("#" + id).oninput = renderKeys; });
+
+// ---------- запуск скана ----------
+const postJSON = (url, body) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) })
+  .then((r) => r.json().then((d) => { if (!r.ok) throw new Error(d.error || r.statusText); return d; }));
+function renderPickCount() {
+  const n = document.querySelectorAll("#scan-sources input:checked").length;
+  $("#scan-pick-count").textContent = `выбрано: ${n}`;
+}
+$("#r-new").onclick = () => {
+  const grid = $("#scan-sources");
+  if (!grid.children.length) {
+    SOURCES.forEach((s) => {
+      const lb = el("label"); const cb = el("input"); cb.type = "checkbox"; cb.value = s.name; cb.onchange = renderPickCount;
+      lb.title = s.description || ""; lb.appendChild(cb); lb.appendChild(document.createTextNode(s.name)); grid.appendChild(lb);
+    });
+  }
+  $("#scan-err").textContent = ""; renderPickCount();
+  $("#dlg-scan").showModal(); $("#scan-targets").focus();
+};
+$("#scan-mode").onchange = () => { $("#scan-pick").hidden = $("#scan-mode").value !== "pick"; };
+$("#scan-x").onclick = $("#scan-cancel").onclick = () => $("#dlg-scan").close();
+$("#scan-go").onclick = () => {
+  const modules = $("#scan-mode").value === "pick" ? [...document.querySelectorAll("#scan-sources input:checked")].map((c) => c.value) : [];
+  if ($("#scan-mode").value === "pick" && !modules.length) { $("#scan-err").textContent = "Выберите хотя бы один источник."; return; }
+  $("#scan-go").disabled = true; $("#scan-err").textContent = "";
+  postJSON("/api/scans/start", { targets: $("#scan-targets").value, name: $("#scan-name").value.trim(), modules })
+    .then((job) => { $("#dlg-scan").close(); $("#scan-targets").value = ""; $("#scan-name").value = ""; renderJob(job); pollJobs(); })
+    .catch((e) => { $("#scan-err").textContent = e.message; })
+    .finally(() => { $("#scan-go").disabled = false; });
+};
+
+// ---------- текущий скан ----------
+let JOB = null, jobTimer = null, jobHidden = null;
+const fmtDur = (sec) => { sec = Math.max(0, Math.round(sec)); const m = Math.floor(sec / 60); return m ? `${m} мин ${sec % 60} с` : `${sec} с`; };
+function renderJob(j) {
+  JOB = j;
+  const box = $("#r-job");
+  if (!j || jobHidden === j.name) { box.hidden = true; return; }
+  box.hidden = false;
+  const tg = j.targets.join(", ");
+  const src = j.modules.length ? `${j.modules.length} источн.` : "весь пассивный набор";
+  if (j.running) {
+    $("#job-title").textContent = `${j.stopping ? "Останавливается" : "Идёт"} скан ${j.name}: ${tg} · ${src} · ${fmtDur(Date.now() / 1000 - j.started)}`;
+  } else {
+    const ok = j.returncode === 0;
+    $("#job-title").textContent = `Скан ${j.name} ${ok ? "завершён" : `завершился с кодом ${j.returncode}`}: ${tg}`;
+  }
+  $("#job-spin").hidden = !j.running;
+  $("#job-stop").hidden = !j.running; $("#job-stop").disabled = !!j.stopping;
+  $("#job-open").hidden = j.running; $("#job-hide").hidden = j.running;
+  $("#job-log").textContent = j.log.join("\n");
+  $("#job-log").scrollTop = $("#job-log").scrollHeight;
+}
+function pollJobs() {
+  clearTimeout(jobTimer);
+  fetch("/api/jobs").then((r) => r.json()).then((jobs) => {
+    const j = jobs[0] || null;
+    const wasRunning = JOB && JOB.running;
+    renderJob(j);
+    if (j && j.running) jobTimer = setTimeout(pollJobs, 4000);
+    else if (wasRunning) loadScanList();
+  }).catch(() => { jobTimer = setTimeout(pollJobs, 8000); });
+}
+$("#job-stop").onclick = () => { if (JOB) postJSON(`/api/jobs/${encodeURIComponent(JOB.name)}/stop`).then(renderJob).catch((e) => alert(e.message)); };
+$("#job-hide").onclick = () => { if (JOB) { jobHidden = JOB.name; renderJob(JOB); } };
+$("#job-open").onclick = () => { if (!JOB) return; const n = JOB.name; loadScanList(n).then(() => { $("#r-scan").value = n; $("#r-report").disabled = false; loadScan(n); }); };
+pollJobs();
+
+// ---------- отчёт по источникам ----------
+const REP_STATE = { ok: "нашёл данные", nodata: "без данных", failed: "не стартовал", error: "ошибка в работе" };
+const REP_STATE_CLS = { ok: "ok", nodata: "nodata", failed: "failed", error: "error" };
+let REPORT = null, repSort = { k: "assets", dir: -1 };
+const fmtTs = (ts) => ts ? fmtSeen(ts) : "—";
+const typeChips = (td, obj) => {
+  const ent = Object.entries(obj || {});
+  if (!ent.length) { td.appendChild(el("span", "muted", "—")); return; }
+  ent.forEach(([k, v]) => { const c = el("span", "chip", k); c.appendChild(el("b", null, String(v))); td.appendChild(c); });
+};
+function renderReport() {
+  const r = REPORT, b = $("#rep-body"); b.innerHTML = "";
+  const meta = el("div", "rep-meta");
+  meta.innerHTML = "";
+  const addMeta = (k, v) => { meta.appendChild(document.createTextNode(k + " ")); meta.appendChild(el("b", null, v)); meta.appendChild(document.createTextNode("   ")); };
+  addMeta("Цели:", (r.targets || []).join(", ") || "—");
+  addMeta("Начат:", fmtTs(r.started_at));
+  addMeta("Длительность:", r.duration || "—");
+  addMeta("Статус:", r.status || "—");
+  b.appendChild(meta);
+
+  const k = el("div", "kpis");
+  const kpi = (v, label) => { const d = el("div", "kpi"); d.appendChild(el("div", "v", String(v))); d.appendChild(el("div", "k", label)); k.appendChild(d); };
+  const active = r.sources.filter((s) => s.state === "ok").length;
+  kpi(r.assets, "уникальных активов");
+  kpi(`${active} / ${r.sources.length}`, "источников нашли данные");
+  kpi(r.by_status.valid || 0, "валидных");
+  kpi(r.by_status.historical || 0, "исторических");
+  kpi(r.third_party || 0, "инфраструктура третьей стороны");
+  kpi(r.false || 0, "отброшено как ложные");
+  b.appendChild(k);
+
+  const types = el("div"); types.style.marginBottom = "10px"; typeChips(types, r.by_type); b.appendChild(types);
+  const dnsEnt = Object.entries(r.dns_check || {});
+  if (dnsEnt.length) {
+    const dns = el("div"); dns.style.marginBottom = "14px";
+    dns.appendChild(el("span", "muted", "DNS-проверка имён: "));
+    const named = {}; dnsEnt.forEach(([k, v]) => { named[DNS_LABEL[k] || k] = v; }); typeChips(dns, named);
+    b.appendChild(dns);
+  }
+
+  const wrap = el("div", "tablewrap"); const t = el("table"); const th = el("thead"); const hr = el("tr");
+  const cols = [["name", "Источник"], ["state", "Состояние"], ["assets", "Активов", "num"], ["only", "Только здесь", "num"],
+    [null, "Какие данные"], ["valid", "Валидно", "num"], ["historical", "Истор.", "num"], ["false", "Ложных", "num"]];
+  cols.forEach(([key, label, cls]) => {
+    const h = el("th", (key ? "sortable " : "") + (cls || ""), label + (repSort.k === key ? (repSort.dir > 0 ? " ↑" : " ↓") : ""));
+    if (key) h.onclick = () => { repSort.dir = repSort.k === key ? -repSort.dir : (key === "name" || key === "state" ? 1 : -1); repSort.k = key; renderReport(); };
+    hr.appendChild(h);
+  });
+  th.appendChild(hr); t.appendChild(th);
+  const val = (s, key) => key === "valid" || key === "historical" ? (s.status[key] || 0) : s[key];
+  const rows = [...r.sources].sort((a, c) => {
+    const x = val(a, repSort.k), y = val(c, repSort.k);
+    return ((x < y ? -1 : x > y ? 1 : 0) * repSort.dir) || (c.assets - a.assets) || a.name.localeCompare(c.name);
+  });
+  const tb = el("tbody");
+  for (const s of rows) {
+    const tr = el("tr");
+    tr.appendChild(el("td", "name", s.name));
+    const tdSt = el("td"); const st = el("span", "st " + (REP_STATE_CLS[s.state] || ""), REP_STATE[s.state] || s.state);
+    if (s.detail) st.title = s.detail; tdSt.appendChild(st);
+    if (s.detail) tdSt.appendChild(el("div", "muted", s.detail.length > 70 ? s.detail.slice(0, 70) + "…" : s.detail));
+    tr.appendChild(tdSt);
+    tr.appendChild(el("td", "num", String(s.assets)));
+    tr.appendChild(el("td", "num", String(s.only)));
+    const tdT = el("td"); typeChips(tdT, s.types); tr.appendChild(tdT);
+    tr.appendChild(el("td", "num", String(s.status.valid || 0)));
+    tr.appendChild(el("td", "num", String(s.status.historical || 0)));
+    tr.appendChild(el("td", "num", String(s.false || 0)));
+    tb.appendChild(tr);
+  }
+  t.appendChild(tb); wrap.appendChild(t); b.appendChild(wrap);
+  b.appendChild(el("div", "count", "Активов — уникальных (тип + значение) от источника; «только здесь» — не подтверждён ни одним другим источником. " +
+    "Валидно/истор. — итоговый статус сущности по всем путям. dnsresolve — записи живого DNS-резолва." +
+    (r.has_console ? "" : " Лога консоли нет: источники без данных и ошибки старта не показаны.")));
+  b.lastChild.style.marginTop = "10px";
+}
+$("#r-report").onclick = () => {
+  const name = $("#r-scan").value; if (!name) return;
+  $("#rep-name").textContent = `Отчёт: ${name}`; $("#rep-body").innerHTML = '<div class="empty">Загрузка…</div>';
+  $("#dlg-report").showModal();
+  fetch("/api/report/" + encodeURIComponent(name)).then((r) => r.json()).then((d) => {
+    if (d.error) throw new Error(d.error);
+    REPORT = d; renderReport();
+  }).catch((e) => { $("#rep-body").innerHTML = ""; $("#rep-body").appendChild(el("div", "empty", "Не удалось построить отчёт: " + e.message)); });
+};
+$("#rep-x").onclick = () => $("#dlg-report").close();
+</script>
+</body>
+</html>
