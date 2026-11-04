@@ -8,12 +8,12 @@ BLS = "blacklanternsecurity.com"
 
 
 class TestValidity(ModuleTestBase):
-    # certspotter — актуальный источник (только неистёкшие серты), crt — исторический (вся CT-история)
+    # certspotter is a current source (unexpired certificates only), crt is historical (the whole CT history)
     modules_overrides = ["certspotter", "crt"]
     config_overrides = {
         "dns": {"minimal": False},
         "scope": {"report_distance": 1},
-        # нерезолвящиеся имена — исторические находки, их должно быть видно в выводе
+        # names that do not resolve are historical findings and must be visible in the output
         "omit_event_types": ["HTTP_RESPONSE", "RAW_TEXT", "URL_UNVERIFIED", "RAW_DNS_RECORD"],
     }
 
@@ -24,9 +24,9 @@ class TestValidity(ModuleTestBase):
                 f"live.{BLS}": {"A": ["127.0.0.2"]},
                 f"old.{BLS}": {"A": ["127.0.0.3"]},
                 f"fake.{BLS}": {"A": ["127.0.0.4"]},
-                # висячий CNAME: цель CNAME не резолвится
+                # dangling CNAME: the CNAME target does not resolve
                 f"dangling.{BLS}": {"CNAME": ["gone-saas.example.org"]},
-                # stale.* и gone.* в DNS нет
+                # stale.* and gone.* are not in DNS
             }
         )
         module_test.blasthttp_mock.add_response(
@@ -40,7 +40,7 @@ class TestValidity(ModuleTestBase):
         for name in ("certspotter", "crt"):
             module_test.scan.modules[name].abort_if = lambda e: False
 
-        # проверка-заглушка: помечает находку ложной
+        # stub check: marks a finding as false
         def fake_check(event):
             if event.host == f"fake.{BLS}":
                 return VERDICT_FALSE, "test: fake"
@@ -59,16 +59,16 @@ class TestValidity(ModuleTestBase):
         find = self.find
         assert "validity-valid" in find(events, "DNS_NAME", BLS, "SEED").tags
 
-        # не резолвится → историческое, даже от актуального источника
+        # does not resolve -> historical, even from a current source
         stale = find(events, "DNS_NAME_UNRESOLVED", f"stale.{BLS}", "certspotter")
         assert {"validity-historical", "freshness-historical", "dns-check-nxdomain"} <= stale.tags
         gone = find(events, "DNS_NAME_UNRESOLVED", f"gone.{BLS}", "crt")
         assert {"validity-historical", "dns-check-nxdomain"} <= gone.tags
-        # CNAME без адреса — висячий
+        # CNAME without an address is dangling
         dangling = find(events, "DNS_NAME", f"dangling.{BLS}", "crt")
         assert {"validity-historical", "dns-check-dangling"} <= dangling.tags
 
-        # ложное не попадает в скан и не рекурсирует, но пишется в журнал
+        # a false finding is not passed to the scan and does not recurse, but is logged
         assert not any(e.data == f"fake.{BLS}" for e in events)
         assert not any(e.data == "127.0.0.4" for e in events)
         log = module_test.scan.home / "validity_false.jsonl"
@@ -82,17 +82,17 @@ class TestValidity(ModuleTestBase):
     def check(self, module_test, events):
         self.check_common(module_test, events)
         find = self.find
-        # имя цели резолвится → подтверждено сейчас, независимо от источника
+        # a target name that resolves -> confirmed now, whatever the source
         live = find(events, "DNS_NAME", f"live.{BLS}", "certspotter")
         assert {"validity-valid", "freshness-verified", "dns-check-ok"} <= live.tags
         old = find(events, "DNS_NAME", f"old.{BLS}", "crt")
         assert {"validity-valid", "freshness-verified", "dns-check-ok"} <= old.tags
-        # потомки подтверждённого имени — валидные
+        # descendants of a confirmed name are valid
         assert "validity-valid" in find(events, "IP_ADDRESS", "127.0.0.3").tags
 
 
 class TestValidity_NoPromote(TestValidity):
-    """promote_resolved: none — резолв только понижает, правило «исторический родитель» не снимается."""
+    """promote_resolved: none - resolution only demotes; the historical-parent rule is not lifted."""
 
     config_overrides = {
         **TestValidity.config_overrides,
@@ -106,13 +106,13 @@ class TestValidity_NoPromote(TestValidity):
         assert {"validity-valid", "freshness-current", "dns-check-ok"} <= live.tags
         old = find(events, "DNS_NAME", f"old.{BLS}", "crt")
         assert {"validity-historical", "freshness-historical", "dns-check-ok"} <= old.tags
-        # живой DNS-резолв исторического имени: свой источник актуален, но родитель исторический
+        # live DNS resolution of a historical name: its own source is current, but the parent is historical
         old_ip = find(events, "IP_ADDRESS", "127.0.0.3")
         assert {"validity-historical", "freshness-current"} <= old_ip.tags
 
 
 class TestValidity_ModuleFreshness(TestValidity):
-    """Каждый модуль, порождающий события, обязан объявить meta["freshness"]."""
+    """Every module that produces events must declare meta["freshness"]."""
 
     def check(self, module_test, events):
         from bbot.core.modules import MODULE_LOADER
@@ -128,12 +128,12 @@ class TestValidity_ModuleFreshness(TestValidity):
 
 
 class TestValidity_RelationsAndJunk(ModuleTestBase):
-    """Связь вне скоупа и мусор: чужое имя со страницы скрывается, адреса-заглушки и имена файлов отбрасываются,
-    запись DNS цели на внешнего провайдера и внешний контакт остаются."""
+    """Out-of-scope relations and junk: a foreign name from a page is hidden, placeholder emails and file names are dropped,
+    a target DNS record pointing to an external provider and an external contact are kept."""
 
     module_name = "validity"
     modules_overrides = []
-    # distance 2 — чтобы IP провайдера (A-запись ns1) резолвился и попал в вывод
+    # distance 2, so the provider IP (ns1's A record) resolves and reaches the output
     config_overrides = {"dns": {"minimal": False, "search_distance": 2}, "scope": {"report_distance": 2}}
 
     async def setup_after_prep(self, module_test):
@@ -147,7 +147,7 @@ class TestValidity_RelationsAndJunk(ModuleTestBase):
         from bbot.modules.base import BaseModule
 
         class page_links(BaseModule):
-            """Как excavate/host: имена и адреса, найденные на странице цели."""
+            """Like excavate/host: names and emails found on a target page."""
 
             _name = "page_links"
             watched_events = ["DNS_NAME"]
@@ -166,16 +166,16 @@ class TestValidity_RelationsAndJunk(ModuleTestBase):
 
     def check(self, module_test, events):
         data = {e.data for e in events if isinstance(e.data, str)}
-        # внешний контакт и провайдер DNS цели — валидные
+        # an external contact and the target's DNS provider are valid
         ns = TestValidity.find(events, "DNS_NAME", "ns1.dnsprovider.io", "NS")
         assert {"validity-valid", "third-party"} <= ns.tags
-        # IP провайдера — тоже третья сторона; сид и его IP — активы цели
+        # the provider IP is third-party too; the seed and its IP are target assets
         assert "third-party" in TestValidity.find(events, "IP_ADDRESS", "127.0.0.9").tags
         assert "third-party" not in TestValidity.find(events, "DNS_NAME", BLS, "SEED").tags
         assert "third-party" not in TestValidity.find(events, "IP_ADDRESS", "127.0.0.1").tags
         contact = TestValidity.find(events, "EMAIL_ADDRESS", "info@othercorp.io")
         assert "validity-valid" in contact.tags
-        # чужое имя со страницы и мусор — не в выводе
+        # a foreign name from the page and junk are not in the output
         for junk in ("cdn.othercorp.io", "hand@3x.png", "user@gmail.com", "email@email.com", "127.0.0.8"):
             assert junk not in data, junk
 
@@ -186,12 +186,12 @@ class TestValidity_RelationsAndJunk(ModuleTestBase):
         assert records["hand@3x.png"]["hidden"] is False and "no public suffix" in records["hand@3x.png"]["reason"]
         assert "placeholder" in records["user@gmail.com"]["reason"]
         assert "placeholder" in records["email@email.com"]["reason"]
-        # скрытый кандидат виден модулям (related_domains), но его потомки не рекурсируют
+        # the hidden candidate is visible to modules (related_domains), but its descendants do not recurse
         assert "127.0.0.8" not in records or records["127.0.0.8"]["hidden"] is False
 
 
 class TestValidity_HTTP(ModuleTestBase):
-    """Ссылки из архива (исторический источник): живой ответ цели → valid (verified), 410 → historical."""
+    """Links from an archive (historical source): a live target answer -> valid (verified), 410 -> historical."""
 
     module_name = "validity"
     targets = [HTTPSERVER_URL]
@@ -210,7 +210,7 @@ class TestValidity_HTTP(ModuleTestBase):
         from bbot.modules.base import BaseModule
 
         class archive(BaseModule):
-            """Как wayback: старые ссылки на ресурсы цели."""
+            """Like wayback: old links to target resources."""
 
             _name = "archive"
             watched_events = ["URL"]

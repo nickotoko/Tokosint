@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Веб-интерфейс тулкита: источники (метаданные BBoT) и результаты сканов из scans/.
-#   bin/web [порт]   поднять локальный бэкенд (по умолчанию 8777), только на 127.0.0.1
+# Tokosint web UI: scan analysis, sources (BBoT module metadata) and API keys.
+#   bin/web [port]   start the local backend (default 8777), listens on 127.0.0.1 only
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export BBOT_CONFIG_DIR="$ROOT/config"

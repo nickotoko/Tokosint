@@ -1,5 +1,5 @@
 {
-  "_comment": "Модули без внешнего эндпоинта (DNS/локальная логика) — глубокий хелчек их не запрашивает, статус local.",
+  "_comment": "Modules without an external endpoint (DNS/local logic): the deep health check skips them, status local.",
   "affiliates": null,
   "asn": null,
   "bucket_file_enum": null,

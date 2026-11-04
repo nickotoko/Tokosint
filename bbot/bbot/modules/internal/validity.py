@@ -3,100 +3,104 @@ import json
 from bbot.modules.base import BaseInterceptModule
 from bbot.core.config.models import BaseModuleConfig, Field
 
-# Статусы находки (IoC) по возрастанию: ложное < историческое < валидное.
+# Finding (IoC) statuses in ascending order: false < historical < valid.
 FALSE, HISTORICAL, VALID = 0, 1, 2
 STATUS_NAMES = {FALSE: "false", HISTORICAL: "historical", VALID: "valid"}
 STATUS_BY_NAME = {v: k for k, v in STATUS_NAMES.items()}
-# Собственная актуальность «подтверждено проверкой сейчас»: статус valid независимо от родителя.
+# Own freshness "confirmed by a check now": status valid regardless of the parent.
 VERIFIED = 3
 OWN_NAMES = {None: "inherit", FALSE: "false", HISTORICAL: "historical", VALID: "current", VERIFIED: "verified"}
 
-# Актуальность данных источника — `meta["freshness"]` каждого модуля, порождающего события:
-#   current    — источник отражает состояние на сейчас (живой DNS, неистёкшие серты, текущий скан хоста)
-#   historical — архив / passive DNS / индекс: данные могли устареть
-#   inherit    — производное из родителя (разбор ответа, файла, URL), своей актуальности нет
+# Source data freshness - `meta["freshness"]` of every module that produces events:
+#   current    - the source reflects the present state (live DNS, unexpired certs, a current host scan)
+#   historical - archive / passive DNS / index: the data may be outdated
+#   inherit    - derived from the parent (parsed response, file, URL), no freshness of its own
 FRESHNESS = {"current": VALID, "historical": HISTORICAL, "inherit": None}
-# Фиктивные модули ядра: DNS-записи живого резолва и сиды цели — актуальны.
+# Core dummy modules: DNS records of live resolution and target seeds are current.
 FRESHNESS_BY_DUMMY_TYPE = {"DNS": "current", "SEED": "current"}
 
-# Вердикты проверок второго этапа (по убыванию силы): ложное, «устарело» (не выше historical),
-# «подтверждено сейчас» (valid, даже если родитель исторический).
+# Stage 2 check verdicts (strongest first): false, "outdated" (capped at historical),
+# "confirmed now" (valid even if the parent is historical).
 VERDICT_FALSE, VERDICT_HISTORICAL, VERDICT_VERIFIED = "false", "historical", "verified"
-# Ложное как связь с целью, но кандидат для анализаторов связей: скрывается (internal), а не отбрасывается.
+# False as a relation to the target, but a candidate for relation analysers: hidden (internal), not dropped.
 VERDICT_UNRELATED = "unrelated"
 
 DNS_NAME_TYPES = ("DNS_NAME", "DNS_NAME_UNRESOLVED")
-# Живой ответ HTTP (тег status-NNN на URL): ресурс сейчас отвечает — кроме «нет такого ресурса».
+# Live HTTP answer (status-NNN tag on a URL): the resource answers now, except "no such resource".
 HTTP_GONE = (404, 410)
 PROMOTE_POLICIES = ("in_scope", "none")
 
-# Зарезервированные для примеров домены (RFC 2606); зоны test/local/invalid/localhost/example
-# отсекаются отсутствием публичного суффикса.
+# Domains reserved for examples (RFC 2606); the test/local/invalid/localhost/example zones
+# are caught by the missing public suffix.
 RESERVED_DOMAINS = {"example.com", "example.net", "example.org"}
-# Локальные части адресов-заглушек из форм и документации (user@…, email@…); проверяются только на чужих доменах.
+# Local parts of placeholder emails from forms and docs (user@..., email@...); checked only on foreign domains.
 PLACEHOLDER_LOCALS = {
     "user", "username", "usermail", "name", "email", "mail", "my", "you", "your", "test", "sender", "client",
     "login", "example", "somebody", "someone",
 }  # fmt: skip
-# Тег модуля-источника: принадлежность найденного профиля/аккаунта цели проверить не удалось → ложное.
+# Source module tag: ownership of the found profile/account by the target could not be verified -> false.
 OWNER_UNVERIFIED_TAG = "owner-unverified"
-# Ресурс третьей стороны, которым пользуется цель (провайдер из её записей DNS): связь valid, но это не актив цели.
+# A third-party resource the target uses (a provider from its DNS records): the relation is valid, but not a target asset.
 THIRD_PARTY_TAG = "third-party"
 
 
 class validity(BaseInterceptModule):
     """
-    Проставляет каждой находке статус: valid / historical / false.
+    Tags every finding with a status: valid / historical / false.
 
-    Этап 1 — правило рекурсии: статус = min(актуальность источника, статус родителя).
-    У валидного родителя дети бывают валидными, историческими и ложными;
-    у исторического — по умолчанию только историческими (или ложными). Ложные не попадают
-    в скан (не рекурсируют и не сохраняются) — пишутся в `validity_false.jsonl` скана.
+    Stage 1 - recursion rule: status = min(source freshness, parent status).
+    A valid parent may have valid, historical and false children; a historical parent by default
+    only historical (or false) ones. False findings do not enter the scan (no recursion, not saved);
+    they are logged to the scan's `validity_false.jsonl`.
 
-    Этап 2 — проверки (`self.checks`): синхронные функции `check(event) -> (вердикт, причина) | None`,
-    применяются при разметке события, поэтому потомки всегда видят уже проверенного родителя.
-      false       — находка ложная;
-      historical  — статус не выше historical (например, имя не резолвится);
-      verified    — подтверждено сейчас: valid, даже если путь обнаружения исторический
-                    («по умолчанию» из правила рекурсии снимается только так).
-    Проверки читают то, что уже есть на событии (DNS-записи от dnsresolve, cloud-теги), сами к цели не ходят.
+    Stage 2 - checks (`self.checks`): synchronous functions `check(event) -> (verdict, reason) | None`,
+    applied when an event is tagged, so descendants always see an already checked parent.
+      false       - the finding is false;
+      historical  - status is capped at historical (e.g. the name does not resolve);
+      verified    - confirmed now: valid even if the discovery path is historical
+                    (the only way to lift the "by default" part of the recursion rule).
+    Checks read what is already on the event (DNS records from dnsresolve, cloud tags); they never contact the target.
 
-    DNS-проверка (`dns_check`) для DNS_NAME — по результату dnsresolve:
-      нет записей (NXDOMAIN/пусто)      → historical, тег dns-check-nxdomain
-      ошибка резолва (SERVFAIL/таймаут) → без изменений, dns-check-error
-      CNAME без адреса (висячий)        → historical, dns-check-dangling
-      wildcard                          → без изменений (резолв по wildcard не доказательство), dns-check-wildcard
-      резолвится                        → dns-check-ok; при `promote_resolved: in_scope` имя в скоупе по строке
-                                          (поддомен цели) → verified
+    DNS check (`dns_check`) for DNS_NAME, based on dnsresolve's result:
+      no records (NXDOMAIN/empty)       -> historical, tag dns-check-nxdomain
+      resolution error (SERVFAIL/timeout) -> unchanged, dns-check-error
+      CNAME without an address (dangling) -> historical, dns-check-dangling
+      wildcard                          -> unchanged (wildcard resolution proves nothing), dns-check-wildcard
+      resolves                          -> dns-check-ok; with `promote_resolved: in_scope` a name in scope by name
+                                           (a target subdomain) -> verified
 
-    Проверка связи (`relation_check`) — DNS-имя вне скоупа валидно только при доказанной связи:
-      запись DNS валидного родителя (NS/MX/CNAME… — цель пользуется ресурсом), модуль с `meta["proves_relation"]`
-      (related_domains — вердикт verified). Ссылка со страницы, соседство по IP, общий сертификат — не доказательство
-      → вердикт unrelated: статус false, но событие не отбрасывается, а скрывается (internal) — в вывод не попадает,
-      анализаторы связей (related_domains, сам резолвит кандидатов) его видят и могут продвинуть домен.
-      Потомки скрытого имени — обычные ложные (отбрасываются), рекурсии от него нет.
+    HTTP check (`http_check`) for URLs with a status-NNN tag (a live http answer): 404/410 -> historical
+    (the resource is gone, the path may have come from an archive); 5xx/400 -> no verdict; otherwise
+    (2xx/3xx/401/403/405...) the resource answers -> verified if the host is in scope and `promote_resolved: in_scope`.
+    HTTP_RESPONSE and the findings extracted from it inherit the URL's status.
 
-    Тег `third-party`: имя вне скоупа из записи DNS цели (MX/NS/CNAME… на провайдера) и его потомки вне скоупа —
-    связь valid («цель пользуется»), но это инфраструктура третьей стороны, а не актив цели.
+    Relation check (`relation_check`): an out-of-scope DNS name is valid only with a proven relation -
+      a DNS record of a valid parent (NS/MX/CNAME... - the target uses the resource) or a module with
+      `meta["proves_relation"]` (related_domains -> verified). A link on a page, a shared IP, a shared certificate
+      prove nothing -> verdict unrelated: status false, but the event is hidden (internal) instead of dropped -
+      it never reaches the output, yet relation analysers (related_domains resolves candidates itself) see it
+      and may promote the domain. Descendants of a hidden name are ordinary false findings (dropped), no recursion.
 
-    Проверка мусора (`junk_check`) — false (кроме имён из записей DNS): имя/адрес без публичного суффикса (`hand@3x.png`, `*.test`, `*.local`),
-    зарезервированные домены (example.com), адреса-заглушки на чужих доменах (user@…, email@…), события с тегом
-    `owner-unverified` от модуля-источника (профиль найден по совпадению имени, принадлежность не подтвердилась).
+    Tag `third-party`: an out-of-scope name from a target DNS record (MX/NS/CNAME... to a provider) and its
+    out-of-scope descendants - the relation is valid ("the target uses it"), but it is third-party
+    infrastructure, not a target asset.
 
-    Ложное отбрасывается (`drop_false`), unrelated — скрывается; оба пишутся в `validity_false.jsonl`.
+    Junk check (`junk_check`) - false (except names from DNS records): names/emails without a public suffix
+    (`hand@3x.png`, `*.test`, `*.local`), reserved domains (example.com), placeholder emails on foreign domains
+    (user@..., email@...), events tagged `owner-unverified` by the source module (a profile found by a name match
+    whose ownership could not be verified).
 
-    HTTP-проверка (`http_check`) для URL с тегом status-NNN (живой ответ http): 404/410 → historical
-    (ресурса уже нет, путь мог прийти из архива); 5xx/400 — без вывода; иначе (2xx/3xx/401/403/405…) ресурс отвечает →
-    verified, если хост в скоупе и `promote_resolved: in_scope`. HTTP_RESPONSE и находки из него наследуют статус URL.
+    False findings are dropped (`drop_false`), unrelated ones are hidden; both are logged to `validity_false.jsonl`.
 
-    Теги на событии:
-      validity-<status>    — статус наблюдения в рамках скана
-      freshness-<level>    — собственная актуальность наблюдения относительно родителя в выводе
-                             (current / historical / inherit / verified; omitted-родители свёрнуты);
-                             по ним после скана статус сущности пересчитывается по всем путям (web/validity.py)
+    Event tags:
+      validity-<status>    - the observation's status within the scan
+      freshness-<level>    - the observation's own freshness relative to its parent in the output
+                             (current / historical / inherit / verified / false; omitted parents are folded in);
+                             after the scan they are used to recompute the finding's status over all paths
+                             (web/validity.py)
 
-    Модуль-источник может переопределить актуальность конкретного события тегом
-    `freshness-current` / `freshness-historical` (например, по дате last_seen записи).
+    A source module may override the freshness of a single event with a `freshness-current` /
+    `freshness-historical` tag (e.g. based on a record's last_seen date).
     """
 
     watched_events = ["*"]
@@ -133,7 +137,7 @@ class validity(BaseInterceptModule):
         )
 
     scope_distance_modifier = None
-    # после dnsresolve (1) и cloudcheck (3): проверкам нужны DNS-записи и cloud-теги
+    # after dnsresolve (1) and cloudcheck (3): the checks need DNS records and cloud tags
     _priority = 4
 
     async def setup(self):
@@ -150,18 +154,18 @@ class validity(BaseInterceptModule):
             self.checks.append(self.check_dns)
         if self.config.get("http_check", True):
             self.checks.append(self.check_http)
-        # uuid события -> [статус, собственная актуальность, причина вердикта]
-        # (у событий __slots__, поэтому состояние хранится в модуле)
+        # event uuid -> [status, own freshness, verdict reason, hidden, third-party]
+        # (events use __slots__, so the state is kept in the module)
         self._state = {}
         self._false_file = None
         self.false_count = 0
         return True
 
-    # --- актуальность источника ---
+    # --- source freshness ---
 
     def source_freshness(self, event):
-        """Собственная актуальность события: VALID / HISTORICAL / None (наследует родителя)."""
-        # явное переопределение модулем (по дате записи и т.п.)
+        """The event's own freshness: VALID / HISTORICAL / None (inherits the parent)."""
+        # explicit override by the module (based on a record date, etc.)
         for level in ("current", "historical"):
             if f"freshness-{level}" in event.tags:
                 return FRESHNESS[level]
@@ -170,12 +174,12 @@ class validity(BaseInterceptModule):
         if level is None:
             level = FRESHNESS_BY_DUMMY_TYPE.get(getattr(module, "_type", ""))
         if level is None:
-            # модуль без объявленной актуальности — консервативно считаем архивом
+            # a module without declared freshness is conservatively treated as an archive
             self.debug(f"Module {module} has no meta freshness, treating {event} as historical")
             level = "historical"
         return FRESHNESS[level]
 
-    # --- проверки этапа 2 ---
+    # --- stage 2 checks ---
 
     def check_dns(self, event):
         if event.type not in DNS_NAME_TYPES or "seed" in event.tags:
@@ -208,7 +212,7 @@ class validity(BaseInterceptModule):
         if event.type not in DNS_NAME_TYPES + ("EMAIL_ADDRESS",):
             return None
         if getattr(event.module, "_type", "") == "DNS":
-            # имя из настоящей записи DNS (MX на mail.corp.local и т.п.) — запись существует, это не мусор, а находка
+            # a name from a real DNS record (MX to mail.corp.local, etc.): the record exists, it is a finding, not junk
             return None
         host = str(event.host or "")
         if not host or self.helpers.is_ip(host):
@@ -235,7 +239,7 @@ class validity(BaseInterceptModule):
         if event.scope_distance <= 0:
             return None
         if getattr(module, "_type", "") == "DNS":
-            # запись DNS валидного родителя: цель сейчас пользуется этим ресурсом
+            # a DNS record of a valid parent: the target uses this resource now
             return None
         return VERDICT_UNRELATED, f"out-of-scope name without proven relation ({module})"
 
@@ -249,14 +253,14 @@ class validity(BaseInterceptModule):
         if status in HTTP_GONE:
             return VERDICT_HISTORICAL, f"HTTP {status}: resource is gone"
         if 500 <= status or status == 400:
-            # ошибка сервера / кривой запрос — о существовании ресурса ничего не говорит
+            # a server error / malformed request says nothing about whether the resource exists
             return None
         if self.promote_resolved == "in_scope" and self.scan.in_target(event.host):
             return VERDICT_VERIFIED, f"HTTP {status}: target resource answers now"
         return None
 
     def run_checks(self, event):
-        """Самый сильный вердикт среди проверок: false > unrelated > historical > verified."""
+        """The strongest verdict among the checks: false > unrelated > historical > verified."""
         found = {}
         for check in self.checks:
             result = check(event)
@@ -268,11 +272,11 @@ class validity(BaseInterceptModule):
                 return verdict, found[verdict]
         return None, ""
 
-    # --- статус ---
+    # --- status ---
 
     def state_of(self, event):
-        """[статус, актуальность, причина, скрыть, третья сторона]; если событие ещё не размечено
-        (гонка очередей), размечает по цепочке родителей."""
+        """[status, freshness, reason, hidden, third-party]; if the event is not tagged yet
+        (queue race), tags it by walking up the parent chain."""
         if event.type == "SCAN":
             return [VALID, VALID, "", False, False]
         state = self._state.get(event.uuid)
@@ -297,7 +301,7 @@ class validity(BaseInterceptModule):
             status = FALSE
             own = FALSE
         elif own != VERIFIED and parent_status == FALSE:
-            # потомок ложного (например, порт-догадка speculate для скрытого чужого имени)
+            # descendant of a false finding (e.g. a speculate port guess for a hidden foreign name)
             status = FALSE
             reason = f"parent is false ({parent.type}: {parent.pretty_string})"
         elif own == VERIFIED:
@@ -305,8 +309,8 @@ class validity(BaseInterceptModule):
         else:
             status = parent_status if own is None else min(own, parent_status)
 
-        # актуальность относительно родителя в выводе: omitted-родители в выводе пропускаются,
-        # поэтому их собственная актуальность сворачивается в ребёнка
+        # freshness relative to the parent in the output: omitted parents are skipped in the output,
+        # so their own freshness is folded into the child
         rel = own
         if has_parent and parent.type != "SCAN" and parent._omit and parent_own not in (None, VERIFIED):
             if rel is None:
@@ -314,8 +318,8 @@ class validity(BaseInterceptModule):
             elif rel not in (VERIFIED, FALSE):
                 rel = min(rel, parent_own)
 
-        # инфраструктура третьей стороны: имя вне скоупа из записи DNS цели (почта, DNS, облако, мониторинг —
-        # цель этим пользуется, но это не её актив) и его потомки вне скоупа (IP, ASN, геолокация)
+        # third-party infrastructure: an out-of-scope name from a target DNS record (mail, DNS, cloud, monitoring -
+        # the target uses it, but it is not its asset) and its out-of-scope descendants (IP, ASN, geolocation)
         third_party = (
             status != FALSE
             and event.scope_distance > 0
@@ -345,16 +349,16 @@ class validity(BaseInterceptModule):
             hidden = state[3]
             self.log_false(event, state[2], hidden)
             if hidden:
-                # кандидат-домен: не в вывод, но анализаторы связей событие видят
+                # candidate domain: not in the output, but relation analysers see the event
                 event.internal = True
-                # тег affiliate заставляет выводить событие всегда — ложному он не положен
+                # the affiliate tag forces the event into the output - a false finding must not have it
                 event.remove_tag("affiliate")
             elif self.drop_false:
                 return False, f"false finding: {state[2]}"
         self.tag(event, state)
         return True
 
-    # --- журнал ложных ---
+    # --- false findings log ---
 
     def log_false(self, event, reason, hidden=False):
         self.false_count += 1

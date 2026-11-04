@@ -28,7 +28,7 @@ class related_domains(BaseModule):
     flags = ["safe", "passive", "affiliates"]
     meta = {
         "freshness": "current",
-        # продвигает домен в скоуп по DNS-доказательствам: связь с целью доказана (validity → verified)
+        # promotes a domain into scope on DNS evidence: the relation to the target is proven (validity -> verified)
         "proves_relation": True,
         "description": "Validate relations of out-of-scope domains to the target via DNS and promote related ones into scope",
         "created_date": "2026-11-01",

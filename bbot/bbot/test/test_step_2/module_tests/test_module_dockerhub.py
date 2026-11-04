@@ -3,7 +3,7 @@ from .base import ModuleTestBase
 
 class TestDockerhub(ModuleTestBase):
     modules_overrides = ["dockerhub", "speculate"]
-    # ссылка на домен цели в профиле — принадлежность подтверждена
+    # the profile links to a target domain: ownership is verified
     profile_url = "https://www.blacklanternsecurity.com"
 
     async def setup_before_prep(self, module_test):
@@ -99,8 +99,8 @@ class TestDockerhub(ModuleTestBase):
 
 
 class TestDockerhub_OwnerUnverified(TestDockerhub):
-    """Тёзка: профиль с тем же именем, но profile_url ведёт не на домен цели → owner-unverified,
-    validity отбрасывает профиль, репозитории не запрашиваются."""
+    """Namesake: same profile name, but profile_url points outside the target -> owner-unverified,
+    validity drops the profile and its repositories are not requested."""
 
     profile_url = "https://blacklantern.io"
 

@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Бэкенд веб-интерфейса тулкита (стандартная библиотека, без зависимостей).
+"""Tokosint web backend (standard library only, no dependencies).
 
-Маршруты:
+Routes:
   GET /                     index.html
-  GET /api/sources          метаданные источников (модули BBoT + квоты)
-  GET /api/scans            список сканов в scans/ (имя, число событий, дата)
-  GET /api/scan/<name>      активы скана, сгруппированные по (тип, данные) с набором источников
-  GET /api/report/<name>    отчёт: сколько и каких данных нашёл каждый источник
-  GET /api/jobs             сканы, запущенные из интерфейса (статус, хвост лога)
-  POST /api/scans/start     запустить скан: {"targets": [...], "name": "...", "modules": [...]}
-  POST /api/jobs/<name>/stop  остановить скан (SIGINT — BBoT дописывает вывод)
-  GET /api/keys             API-ключи источников: задан ли (маска), описание поля
-  POST /api/keys/set        {"module", "field", "value"} — добавить/изменить ключ в config/secrets.yml
-  POST /api/keys/delete     {"module", "field"} — удалить ключ
+  GET /api/sources          source metadata (BBoT modules + quotas)
+  GET /api/scans            scans in scans/ (name, event count, date)
+  GET /api/scan/<name>      scan findings grouped by (type, data) with their sources
+  GET /api/report/<name>    report: what and how much each source found
+  GET /api/jobs             scans started from the UI (status, log tail)
+  POST /api/scans/start     start a scan: {"targets": [...], "name": "...", "modules": [...]}
+  POST /api/jobs/<name>/stop  stop a scan (SIGINT - BBoT finishes writing its output)
+  GET /api/keys             source API keys: set or not (masked), field description
+  POST /api/keys/set        {"module", "field", "value"} - add/change a key in config/secrets.yml
+  POST /api/keys/delete     {"module", "field"} - delete a key
 
-Запускается через bin/web. Читает scans/ только по запросу из своего же интерфейса на 127.0.0.1.
+Started by bin/web. Listens on 127.0.0.1 and serves scans/ only to its own UI.
 """
 
 import json
@@ -83,8 +83,8 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json({"error": "not found"}, 404)
 
     def _same_origin(self):
-        """POST только со своей страницы: Host — локальный адрес сервера (против DNS rebinding),
-        Origin — тот же (против запросов с чужих сайтов), тело — JSON (не «простой» CORS-запрос)."""
+        """POST only from our own page: Host is the server's local address (against DNS rebinding),
+        Origin is the same (against requests from other sites), the body is JSON (not a "simple" CORS request)."""
         host = self.headers.get("Host", "")
         port = self.server.server_address[1]
         if host not in (f"127.0.0.1:{port}", f"localhost:{port}"):
@@ -102,7 +102,7 @@ class Handler(BaseHTTPRequestHandler):
             length = min(int(self.headers.get("Content-Length") or 0), 64 * 1024)
             payload = json.loads(self.rfile.read(length) or b"{}")
             if not isinstance(payload, dict):
-                raise scans.ScanError("ожидается JSON-объект")
+                raise scans.ScanError("a JSON object is expected")
             if route == "/api/scans/start":
                 known = {s["name"] for s in build_sources()}
                 return self._send_json(scans.start_scan(payload, known), 201)
@@ -118,7 +118,7 @@ class Handler(BaseHTTPRequestHandler):
         except (scans.ScanError, apikeys.SecretError) as e:
             return self._send_json({"error": str(e)}, e.code)
         except ValueError:
-            return self._send_json({"error": "некорректный JSON"}, 400)
+            return self._send_json({"error": "invalid JSON"}, 400)
         except Exception as e:  # noqa: BLE001
             return self._send_json({"error": str(e)}, 500)
         self._send_json({"error": "not found"}, 404)
@@ -128,7 +128,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def health_loop():
-    """Фоновый хелчек: при старте — если health.json устарел (>24ч), и далее раз в сутки."""
+    """Background health check: on start if health.json is stale (>24h), then once a day."""
     import time
 
     while True:
@@ -146,11 +146,11 @@ def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8777
     threading.Thread(target=health_loop, daemon=True).start()
     server = ThreadingHTTPServer(("127.0.0.1", port), partial(Handler))
-    print(f"Открой http://127.0.0.1:{port}/  (Ctrl+C — остановить)")
+    print(f"Open http://127.0.0.1:{port}/  (Ctrl+C to stop)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nостановлено")
+        print("\nstopped")
 
 
 if __name__ == "__main__":

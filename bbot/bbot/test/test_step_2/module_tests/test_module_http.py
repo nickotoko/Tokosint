@@ -86,7 +86,7 @@ class TestHTTP_404(ModuleTestBase):
 class TestHTTP_Redirect(ModuleTestBase):
     targets = [HTTPSERVER_URL]
     modules_overrides = ["http", "speculate", "excavate"]
-    # поведение модуля вне скоупа: имена без доказанной связи validity скрывает (D-021), здесь это не проверяется
+    # out-of-scope module behaviour: validity hides names without a proven relation, not tested here
     config_overrides = {"modules": {"validity": {"relation_check": False}}}
 
     async def setup_after_prep(self, module_test):

@@ -24,7 +24,7 @@ class DNSResolve(BaseInterceptModule):
     class HostModule(BaseModule):
         _name = "host"
         _type = "internal"
-        # хост, извлечённый из URL/порта родителя, — производная сущность
+        # a host extracted from the parent's URL/port is a derived finding
         meta = {"freshness": "inherit"}
 
     @property

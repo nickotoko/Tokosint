@@ -21,7 +21,7 @@ class TestDockerPull(ModuleTestBase):
                 "full_name": "",
                 "location": "",
                 "company": "Black Lantern Security",
-                # домен цели в профиле — dockerhub подтверждает владельца (иначе owner-unverified и образы не качаются)
+                # target domain in the profile: dockerhub verifies the owner (otherwise owner-unverified and no image pulls)
                 "profile_url": "https://www.blacklanternsecurity.com",
                 "date_joined": "2022-08-29T15:27:10.227081Z",
                 "gravatar_url": "",

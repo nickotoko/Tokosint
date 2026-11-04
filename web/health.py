@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""Глубокий хелчек источников: реальным сканом BBoT проверяет, что источник отвечает и отдаёт данные.
+"""Deep source health check: a real BBoT scan verifies that a source answers and returns data.
 
-Один тестовый скан нейтральных целей (example.com — IANA-домен для примеров, 1.1.1.1 — публичный DNS Cloudflare)
-со всеми модулями-источниками. По каждому источнику снимается, что реально произошло:
+One test scan of neutral targets (example.com - the IANA example domain, 1.1.1.1 - Cloudflare public DNS)
+with all source modules. For each source we record what actually happened:
 
-  ok       источник отработал и отдал данные (produced > 0)
-  nodata   источник отработал без ошибки, но данных не вернул (produced == 0)
-  down     источник упал (ошибка API/сети) или не стартовал не из-за ключа
-  nokey    источнику нужен API-ключ, а в secrets.yml его нет (модуль не стартовал)
-  local    у источника нет внешнего эндпоинта (DNS/локальная логика) — реальный запрос не нужен
+  ok       the source ran and returned data (produced > 0)
+  nodata   the source ran without errors but returned nothing (produced == 0)
+  down     the source failed (API/network error) or did not start for a reason other than a key
+  nokey    the source needs an API key and secrets.yml has none (the module did not start)
+  local    the source has no external endpoint (DNS/local logic) - no real request needed
 
-⚠ Глубокий хелчек делает НАСТОЯЩИЕ запросы и расходует квоту источников (напр., hunter.io — 50 поисков/мес).
-Поэтому автозапуск — раз в сутки; для разового запуска вручную: `bin/healthcheck`.
+WARNING: the deep check makes REAL requests and spends source quotas (e.g. hunter.io - 50 searches/month).
+That is why it runs automatically once a day; run it manually with `bin/healthcheck`.
 
-Результат пишется в web/health.json, отдаётся сервером через /api/health.
+The result is written to web/health.json and served at /api/health.
 """
 
 import asyncio
@@ -31,12 +31,12 @@ HEALTH_FILE = WEB_DIR / "health.json"
 SECRETS = ROOT / "config" / "secrets.yml"
 PROBES = WEB_DIR / "health_probes.json"
 TEST_TARGETS = ["example.com", "1.1.1.1"]
-TIMEOUT = 420  # жёсткий потолок на весь скан, сек
-TTL = 24 * 3600  # автозапуск раз в сутки
+TIMEOUT = 420  # hard ceiling for the whole scan, seconds
+TTL = 24 * 3600  # automatic run once a day
 
 
 def configured_keys():
-    """Модули с непустым api_key в secrets.yml (только факт наличия, не значение)."""
+    """Modules with a non-empty api_key in secrets.yml (only whether it is set, never the value)."""
     keyed = set()
     if not SECRETS.is_file():
         return keyed
@@ -51,7 +51,7 @@ def configured_keys():
 
 
 def local_modules():
-    """Модули без внешнего эндпоинта (в health_probes.json значение null) — их не тестируем запросом."""
+    """Modules without an external endpoint (null in health_probes.json) - not probed with a request."""
     try:
         probes = json.loads(PROBES.read_text())
     except (OSError, ValueError):
@@ -86,22 +86,22 @@ async def _run_scan(sources, timeout):
 
 def _classify(name, auth_required, scan, keyed, local):
     if name in local:
-        return {"status": "local", "detail": "нет внешнего эндпоинта"}
+        return {"status": "local", "detail": "no external endpoint"}
     mod = scan.modules.get(name)
     if mod is None:
         if auth_required and name not in keyed:
-            return {"status": "nokey", "detail": "нужен API-ключ, в secrets.yml нет"}
-        return {"status": "down", "detail": "модуль не стартовал (setup/ping)"}
+            return {"status": "nokey", "detail": "needs an API key, none in secrets.yml"}
+        return {"status": "down", "detail": "module did not start (setup/ping)"}
     if getattr(mod, "errored", False):
-        return {"status": "down", "detail": "ошибка во время запроса (API/сеть/квота)"}
+        return {"status": "down", "detail": "error during the request (API/network/quota)"}
     st = scan.stats.module_stats.get(name)
     produced = getattr(st, "produced_total", 0) if st else 0
     consumed = getattr(st, "consumed_total", 0) if st else 0
     if produced > 0:
-        return {"status": "ok", "detail": f"отдал данные: {produced} событий"}
+        return {"status": "ok", "detail": f"returned data: {produced} events"}
     if consumed > 0:
-        return {"status": "nodata", "detail": "отработал, данных не вернул"}
-    return {"status": "nodata", "detail": "не получил подходящих событий в тесте"}
+        return {"status": "nodata", "detail": "ran, returned no data"}
+    return {"status": "nodata", "detail": "received no suitable events in the test"}
 
 
 def run_all():
@@ -146,9 +146,9 @@ def is_stale():
 
 
 if __name__ == "__main__":
-    print("Глубокий хелчек: реальные запросы к источникам (расходует квоту). Это займёт несколько минут…")
+    print("Deep health check: real requests to sources (spends quota). This takes a few minutes...")
     out = run_all()
     counts = {}
     for r in out["sources"].values():
         counts[r["status"]] = counts.get(r["status"], 0) + 1
-    print("health.json обновлён:", ", ".join(f"{k}={v}" for k, v in sorted(counts.items())))
+    print("health.json updated:", ", ".join(f"{k}={v}" for k, v in sorted(counts.items())))

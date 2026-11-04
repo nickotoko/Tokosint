@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Собрать web/sources.json из метаданных модулей BBoT + квоты из web/quotas.json.
+"""Build the source list from BBoT module metadata plus quotas from web/quotas.json.
 
-Запускается через bin/web. Данные реальных сканов не читаются.
+Used by bin/web. Scan data is not read here.
 """
 
 import json
@@ -21,7 +21,7 @@ def build_sources():
         if meta.get("type") != "scan":
             continue
         flags = meta.get("flags", [])
-        # источники = пассивные модули, плюс http (его пользователь оставил как исключение)
+        # sources = passive modules plus http (kept as the one deliberate exception)
         if "passive" not in flags and name != "http":
             continue
         m = meta.get("meta", {})
@@ -47,7 +47,7 @@ def main():
     sources = build_sources()
     out = WEB_DIR / "sources.json"
     out.write_text(json.dumps(sources, ensure_ascii=False, indent=2))
-    print(f"web/sources.json: {len(sources)} источников")
+    print(f"web/sources.json: {len(sources)} sources")
 
 
 if __name__ == "__main__":

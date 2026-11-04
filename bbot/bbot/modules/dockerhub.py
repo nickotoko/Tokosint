@@ -42,8 +42,8 @@ class dockerhub(BaseModule):
             if status_code == 200:
                 site_url = f"{self.site_url}/u/{p}"
                 profile_url, verified = self.check_owner(api_result)
-                # профиль найден лишь по совпадению имени с ORG_STUB: без ссылки на домен цели в профиле
-                # это может быть тёзка (validity сочтёт такую находку ложной)
+                # the profile was found only by its name matching the ORG_STUB: without a link to a target domain
+                # in the profile it may be a namesake (validity treats such a finding as false)
                 tags = [] if verified else ["owner-unverified"]
                 note = (
                     f"profile_url {profile_url} is in scope"
@@ -59,7 +59,7 @@ class dockerhub(BaseModule):
                 )
 
     def check_owner(self, api_result):
-        """Принадлежность профиля цели: домен из profile_url профиля/организации входит в скоуп."""
+        """Profile ownership: the domain from the user/org profile_url is in scope."""
         try:
             profile_url = (api_result.json() or {}).get("profile_url") or ""
         except Exception:

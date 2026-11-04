@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Разовый хелчек источников: проверяет их эндпоинты и пишет web/health.json.
-# Сервер bin/web делает то же раз в сутки автоматически.
+# One-off source health check: runs a real scan of neutral targets and writes web/health.json.
+# The bin/web server does the same once a day automatically.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export BBOT_CONFIG_DIR="$ROOT/config"

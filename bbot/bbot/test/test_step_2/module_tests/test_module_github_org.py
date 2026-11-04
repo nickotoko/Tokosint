@@ -365,7 +365,7 @@ class TestGithub_Org_Custom_Target(TestGithub_Org):
         "scope": {"report_distance": 10, "search_distance": 2},
         "omit_event_types": [],
         "speculate": True,
-        # поведение модуля вне скоупа: имена без доказанной связи validity скрывает (D-021), здесь это не проверяется
+        # out-of-scope module behaviour: validity hides names without a proven relation, not tested here
         "modules": {"github_org": {"api_key": "asdf"}, "validity": {"relation_check": False}},
     }
 

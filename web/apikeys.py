@@ -1,8 +1,8 @@
-"""API-ключи источников в config/secrets.yml: список (только маска), добавление/изменение, удаление.
+"""Source API keys in config/secrets.yml: list (masked only), add/change, delete.
 
-Какие поля секретные — из метаданных модулей BBoT (`options_sensitive`), список не зашит вручную.
-Значения ключей наружу не отдаются: только «задан / не задан» и последние 4 символа длинного ключа.
-Файл пишется с правами 600, комментарии-шапка сохраняются (как в `bin/module key`).
+Which fields are secret comes from BBoT module metadata (`options_sensitive`), not a hardcoded list.
+Key values are never returned: only set / not set and the last 4 characters of a long key.
+The file is written with mode 600 and its header comments are kept (same as `bin/module key`).
 """
 
 import os
@@ -41,7 +41,7 @@ def _save(header, data):
 
 def _mask(value):
     if isinstance(value, list):
-        return f"{len(value)} ключ(а)" if value else ""
+        return f"{len(value)} key(s)" if value else ""
     value = str(value or "")
     if not value:
         return ""
@@ -49,7 +49,7 @@ def _mask(value):
 
 
 def sensitive_fields(preloaded):
-    """{модуль: {поле: {desc, mandatory}}} для активных scan-модулей с секретными опциями."""
+    """{module: {field: {desc, mandatory}}} for active scan modules with secret options."""
     out = {}
     for name, p in sorted(preloaded.items()):
         if p.get("type") != "scan":
@@ -87,18 +87,18 @@ def list_secrets(preloaded):
 def _check(preloaded, module, field):
     fields = sensitive_fields(preloaded).get(module)
     if fields is None:
-        raise SecretError(f"у модуля {module!r} нет секретных опций (или он не активен)")
+        raise SecretError(f"module {module!r} has no secret options (or is not active)")
     if field not in fields:
-        raise SecretError(f"у модуля {module} нет секретной опции {field!r}")
+        raise SecretError(f"module {module} has no secret option {field!r}")
 
 
 def set_secret(preloaded, module, field, value):
     _check(preloaded, module, field)
     value = str(value or "").strip()
     if not value:
-        raise SecretError("пустое значение — для удаления используйте «Удалить»")
+        raise SecretError("empty value: use Delete to remove a key")
     if len(value) > MAX_LEN or any(c in value for c in "\r\n\0"):
-        raise SecretError("недопустимое значение ключа")
+        raise SecretError("invalid key value")
     with _lock:
         header, data = _load()
         data.setdefault("modules", {}).setdefault(module, {})[field] = value
@@ -112,7 +112,7 @@ def delete_secret(preloaded, module, field):
         modules = data.get("modules") or {}
         current = modules.get(module) or {}
         if field not in current:
-            raise SecretError("ключ не задан", 404)
+            raise SecretError("key is not set", 404)
         del current[field]
         if not current:
             modules.pop(module, None)

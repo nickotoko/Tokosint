@@ -387,7 +387,7 @@ async def test_wildcards(bbot_scanner):
         "evilcorp.com",
         seeds=["bbot.fdsa.www.test.evilcorp.com"],
         config={
-            # точное сравнение тегов dnsresolve: теги валидации (validity-*, dns-check-*) здесь не нужны
+            # exact dnsresolve tag comparison: validation tags (validity-*, dns-check-*) are not wanted here
             "validity": False,
             "dns": {"minimal": False, "disable": False, "search_distance": 5, "wildcard_ignore": ["evilcorp.com"]},
             "speculate": True,
@@ -453,7 +453,7 @@ async def test_wildcards(bbot_scanner):
         "evilcorp.com",
         seeds=["bbot.fdsa.www.test.evilcorp.com"],
         config={
-            # точное сравнение тегов dnsresolve: теги валидации (validity-*, dns-check-*) здесь не нужны
+            # exact dnsresolve tag comparison: validation tags (validity-*, dns-check-*) are not wanted here
             "validity": False,
             "dns": {"minimal": False, "disable": False, "search_distance": 5, "wildcard_ignore": []},
             "speculate": True,
@@ -557,7 +557,7 @@ async def test_wildcards(bbot_scanner):
     scan = bbot_scanner(
         "evilcorp.com",
         config={
-            # точное сравнение тегов dnsresolve: теги валидации (validity-*, dns-check-*) здесь не нужны
+            # exact dnsresolve tag comparison: validation tags (validity-*, dns-check-*) are not wanted here
             "validity": False,
             "dns": {
                 "minimal": False,

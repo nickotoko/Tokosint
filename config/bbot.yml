@@ -757,11 +757,11 @@
 #   websocket:
 #     preserve_graph: true
 #     ignore_ssl: false
-# Временно отключено (2026-11-01): ~/.cache/cloudcheck принадлежит root, сигнатуры не загружаются,
-# и каждая проверка тормозит скан. Вернуть после `sudo chown -R $(whoami) ~/.cache/cloudcheck ~/.bbot`.
+# cloudcheck is disabled here because a root-owned ~/.cache/cloudcheck slowed every check down;
+# set it back to true if your cache is writable (cloud/CDN tags improve shared-hosting detection).
 cloudcheck: false
-# Итерация 8 (2026-11-04): нерезолвящиеся имена (DNS_NAME_UNRESOLVED) — исторические находки (validity, dns-check-nxdomain),
-# поэтому они пишутся в вывод. Остальное — как в дефолтах BBoT.
+# Names that do not resolve (DNS_NAME_UNRESOLVED) are historical findings (validity, dns-check-nxdomain),
+# so they are written to the output. Everything else matches the BBoT defaults.
 omit_event_types:
   - HTTP_RESPONSE
   - RAW_TEXT

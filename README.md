@@ -1,68 +1,71 @@
 # Tokosint
 
-**Tokosint** — инструмент пассивной разведки по открытым источникам (OSINT) с жёсткой валидацией сущностей и связей.
-Построен на форке [BBoT](https://github.com/blacklanternsecurity/bbot) 3.0.2 (Black Lantern Security):
-рекурсивный движок, модули и типы событий — из BBoT, сверху — слой валидации, отобранный и доработанный набор
-пассивных источников и локальный веб-интерфейс.
+**Tokosint** is a passive OSINT toolkit with strict validation of findings and the relations between them.
+It is built on a fork of [BBoT](https://github.com/blacklanternsecurity/bbot) 3.0.2 by Black Lantern Security:
+the recursive engine, modules and event types come from BBoT; on top of them Tokosint adds a validation layer,
+a curated and reworked set of passive sources, and a local web interface.
 
-> Используйте только для целей, на анализ которых у вас есть право. Инструмент рассчитан на пассивный сбор:
-> запросы идут к сторонним источникам; к инфраструктуре цели — только DNS-резолв и HTTP-запросы `http`-модуля к её
-> собственным веб-ресурсам.
+> Use it only against targets you are authorised to investigate. The toolkit is built for passive collection:
+> requests go to third-party sources; the target's own infrastructure is touched only by DNS resolution and by
+> the `http` module's requests to the target's web resources.
 
-## Концепция
+## Concept
 
-1. **Каждый тип актива — отдельная сущность** со своими параметрами (DNS-имя, IP, URL, порт, email, репозиторий, находка…).
-2. **Источник принимает типизированные сущности и выдаёт типизированные сущности.**
-3. **Поиск рекурсивный:** каждая новая сущность прогоняется по всем подходящим источникам, дважды по одному источнику — нет.
-4. **Ключевое — валидация.** У каждой сущности указана связь: где обнаружена и с какой сущностью связана.
-5. **Три статуса.** *Валидное* — актуально сейчас; *историческое* — было актуально раньше (по нему поиск всё равно идёт,
-   для контекста); *ложное* — не сохраняется и не участвует в рекурсии.
-6. **Мета-поля для валидации:** дата наблюдения, число источников, подтверждающих связь, актуальность данных источника.
+1. **Every asset type is a separate kind of finding** with its own fields (DNS name, IP, URL, port, email,
+   repository, finding…).
+2. **A source takes typed findings as input and produces typed findings.**
+3. **Discovery is recursive:** every new finding is run through every source that accepts it, never twice through
+   the same source.
+4. **Validation is the core.** Every finding records where it was discovered and which finding it is related to.
+5. **Three statuses.** *Valid* — current now; *historical* — was current in the past (still searched, for context);
+   *false* — not stored and not used for recursion.
+6. **Validation metadata:** observation date, number of sources confirming the relation, freshness of the source's data.
 
-## Чем отличается от BBoT
+## What is different from BBoT
 
-### Модель валидации (`bbot/bbot/modules/internal/validity.py`)
-Встроенный intercept-модуль размечает каждое наблюдение после DNS-резолва:
+### Validation model (`bbot/bbot/modules/internal/validity.py`)
+A built-in intercept module tags every observation after DNS resolution:
 
-- **Актуальность источника** — обязательное поле `meta["freshness"]` у каждого модуля, порождающего события:
-  `current` (живой DNS/HTTP, неистёкшие сертификаты, текущее состояние хоста), `historical` (архивы, passive DNS, индексы,
-  история CT), `inherit` (производное из родителя: разбор страницы, файла, URL).
-- **Правило рекурсии:** статус = min(актуальность источника, статус родителя). У валидного родителя дети бывают любыми,
-  у исторического — по умолчанию не валидными.
-- **Проверки** (могут понизить или подтвердить статус):
-  - **DNS:** имя не резолвится → историческое; висячий CNAME → историческое; wildcard — не доказательство;
-    поддомен цели резолвится → *подтверждено сейчас* (валидно, даже если найдено в архиве).
-  - **HTTP:** ресурс цели отвечает → подтверждено; 404/410 → историческое.
-  - **Связь:** DNS-имя вне скоупа валидно, только если связь доказана (запись DNS цели или продвижение модулем
-    `related_domains`). Ссылка со страницы, соседство по IP, общий сертификат — не доказательство: такие имена ложные
-    и скрыты из вывода (анализатор связей их видит и может продвинуть домен).
-  - **Мусор:** имена без публичного суффикса (`hand@3x.png`), `example.*`, адреса-заглушки, профили с неподтверждённым
-    владельцем (найдены лишь по совпадению имени).
-- **Третья сторона:** провайдеры из DNS-записей цели (почта, DNS, облако) — валидная связь с пометкой `third-party`.
-- Ложные находки пишутся в `scans/<скан>/validity_false.jsonl` с причиной.
-- Итоговый статус сущности пересчитывается по графу всех путей обнаружения (`web/validity.py`): если сущность пришла
-  сначала из архива, а потом из актуального источника, она и её потомки становятся валидными без повторных запросов.
+- **Source freshness** — a mandatory `meta["freshness"]` field on every module that produces events:
+  `current` (live DNS/HTTP, unexpired certificates, current host state), `historical` (archives, passive DNS,
+  indexes, CT history), `inherit` (derived from the parent: a parsed page, file or URL).
+- **Recursion rule:** status = min(source freshness, parent status). A valid parent may have children of any
+  status; a historical parent, by default, no valid ones.
+- **Checks** (they may demote a finding or confirm it):
+  - **DNS:** a name that does not resolve → historical; a dangling CNAME → historical; wildcard resolution proves
+    nothing; a target subdomain that resolves → *confirmed now* (valid even if it was found in an archive).
+  - **HTTP:** a target resource that answers → confirmed; 404/410 → historical.
+  - **Relation:** an out-of-scope DNS name is valid only with a proven relation (a target DNS record, or promotion
+    by the `related_domains` module). A link on a page, a shared IP or a shared certificate is not proof: such names
+    are false and hidden from the output (the relation analyser still sees them and may promote the domain).
+  - **Junk:** names without a public suffix (`hand@3x.png`), `example.*`, placeholder emails, profiles whose owner
+    could not be verified (found only because the name matched).
+- **Third party:** providers from the target's DNS records (mail, DNS, cloud) are a valid relation tagged `third-party`.
+- False findings are written to `scans/<scan>/validity_false.jsonl` with the reason.
+- The final status of a finding is recomputed over the graph of all discovery paths (`web/validity.py`): if a finding
+  first arrived from an archive and later from a current source, it and its descendants become valid without
+  querying the sources again.
 
-### Источники
-Набор BBoT сокращён до пассивных модулей, каждый прошёл ревью (бесплатный тариф, зашитые лимиты, ложные связи);
-остальные лежат в `bbot/modules_archive/` и возвращаются командой `bin/module restore <имя>`.
-Добавлены модули: `commoncrawl`, `criminalip`, `crtname`, `hudsonrock`, `netlas`, `robtex`, `shodanct`, `subdomainapi`,
-`thc`, `related_domains` (продвижение связанных доменов в скоуп по DNS-доказательствам: NS/MX/SPF/DMARC).
-Исправлены и доработаны в том числе: `virustotal` (пагинация), `shodan_idb` (режим с ключом), `censys_ip` (Platform API v3),
-`trickest`, `hunterio`, `pgp`, `social`, `dockerhub` (проверка владельца профиля), `trufflehog` (верификация секретов
-выключена по умолчанию — она означала бы использование утёкших учётных данных).
+### Sources
+The BBoT module set was cut down to passive modules, each one reviewed (free tier, hardcoded limits, false
+relations); the rest live in `bbot/modules_archive/` and come back with `bin/module restore <name>`.
+New modules: `commoncrawl`, `criminalip`, `crtname`, `hudsonrock`, `netlas`, `robtex`, `shodanct`, `subdomainapi`,
+`thc`, `related_domains` (promotes related domains into scope on DNS evidence: NS/MX/SPF/DMARC).
+Fixed or reworked, among others: `virustotal` (pagination), `shodan_idb` (API key mode), `censys_ip`
+(Platform API v3), `trickest`, `hunterio`, `pgp`, `social`, `dockerhub` (profile ownership check), `trufflehog`
+(secret verification is off by default — it would mean using leaked credentials).
 
-### Веб-интерфейс (`web/`, без зависимостей и сборки)
-- **Анализ** — запуск сканов, список сканов, активы со статусом (валидно / исторически / ложно с причиной),
-  DNS-проверкой и пометкой третьей стороны; фильтры, сортировка, карточка актива с контекстом обнаружения;
-  отчёт по источникам (что и сколько нашёл каждый, кто не стартовал и почему).
-- **Источники** — метаданные модулей: вход/выход, ключ, квоты, актуальность данных, результат хелчека.
-- **Ключи** — добавление, изменение и удаление API-ключей (значения не возвращаются в интерфейс, только маска).
+### Web interface (`web/`, no dependencies, no build step)
+- **Analysis** — start scans, list scans, findings with their status (valid / historical / false with the reason),
+  DNS check and third-party tag; filters, sorting, a details card with the discovery context;
+  a per-source report (what each source found and how much, which sources did not start and why).
+- **Sources** — module metadata: input/output, API key, quotas, data freshness, health check result.
+- **Keys** — add, change and delete API keys (values are never sent back to the UI, only a mask).
 
-## Установка
+## Installation
 
-Нужны Python 3.12 и [uv](https://docs.astral.sh/uv/). На macOS `blasthttp` собирается из исходников с OpenSSL из Homebrew,
-для бинарных зависимостей некоторых модулей нужен GNU tar (`brew install gnu-tar`).
+Requires Python 3.12 and [uv](https://docs.astral.sh/uv/). On macOS `blasthttp` is built from source against
+Homebrew OpenSSL, and some module dependencies need GNU tar (`brew install gnu-tar`).
 
 ```bash
 git clone https://github.com/nickotoko/Tokosint.git && cd Tokosint
@@ -70,63 +73,64 @@ cd bbot && uv sync --python 3.12 --group dev && cd ..
 # macOS:
 # cd bbot && OPENSSL_DIR=/opt/homebrew/opt/openssl@3 PKG_CONFIG_PATH=/opt/homebrew/opt/openssl@3/lib/pkgconfig \
 #   uv sync --python 3.12 --group dev && cd ..
-cp config/secrets.example.yml config/secrets.yml && chmod 600 config/secrets.yml   # ключи — по желанию
+cp config/secrets.example.yml config/secrets.yml && chmod 600 config/secrets.yml   # API keys are optional
 ```
 
-Конфигурация изолирована в `config/` (переменная `BBOT_CONFIG_DIR`, её ставят скрипты `bin/`): глобальный
-`~/.config/bbot` не используется.
+The configuration is isolated in `config/` (the `BBOT_CONFIG_DIR` variable, set by the `bin/` scripts); the global
+`~/.config/bbot` is not used.
 
-## Запуск
+## Usage
 
 ```bash
-# веб-интерфейс: http://127.0.0.1:8777/  (слушает только localhost)
+# web interface: http://127.0.0.1:8777/  (listens on localhost only)
 bin/web
 
-# скан из командной строки (результаты — в scans/<имя>/)
-bin/osint -t target.example -f passive -y --no-deps -c scope.report_distance=1 -n <имя>
+# command-line scan (results go to scans/<name>/)
+bin/osint -t target.example -f passive -y --no-deps -c scope.report_distance=1 -n <name>
 
-# выбранные источники
-bin/osint -t target.example -m crt certspotter hackertarget -om json -n <имя> -y
+# selected sources only
+bin/osint -t target.example -m crt certspotter hackertarget -om json -n <name> -y
 
-# управление набором модулей
-bin/module list | restore <имя> | archive <имя>
+# manage the module set
+bin/module list | restore <name> | archive <name>
 
-# глубокий хелчек источников (реальные запросы к нейтральным целям)
+# deep source health check (real requests to neutral targets)
 bin/healthcheck
 
-# тесты
+# tests
 cd bbot && .venv/bin/pytest bbot/test/test_step_2/module_tests/test_module_validity.py -q
 bbot/.venv/bin/pytest web/test_validity.py -q
 ```
 
-## Ограничения
+## Limitations
 
-- **Пассивность не абсолютная:** DNS-резолв идёт через системные резолверы и доходит до авторитативных NS цели;
-  модуль `http` обращается к веб-ресурсам цели (без него не проверить, жив ли ресурс). Активные модули BBoT
-  (сканеры портов, брутфорс, фаззинг) вынесены в архив и не рассматривались.
-- **Статус — снимок в момент скана:** резолв и ответы HTTP зависят от резолвера, кэша, геолокации, анти-бот защиты.
-- **Проверки эвристические:** shared hosting определяется по числу имён на IP и владельцу сети; список адресов-заглушек —
-  эвристика; владелец docker-профиля подтверждается только по ссылке на домен цели в профиле. Валидация IP
-  (AS, анти-DDoS-прокси, CDN) и портов через сторонние сервисы — в планах.
-- **Имена вне скоупа без доказанной связи скрываются:** родственный домен попадёт в результаты, только если его продвинет
-  `related_domains` (по NS/MX/SPF/DMARC). Связи по WHOIS и сертификатам пока не используются.
-- **Квоты источников:** многие бесплатные тарифы малы (например, hunter.io — 50 запросов в месяц, VirusTotal — 500 в сутки);
-  веб-сервер раз в сутки запускает глубокий хелчек, который тоже их расходует. Часть источников без ключа не работает.
-- **Один скан одновременно** при запуске из интерфейса; статус запущенного скана хранится в памяти сервера.
-- Часть upstream-тестов BBoT ссылается на модули, вынесенные в архив, и падает.
-- Проверено на macOS; Linux должен работать так же (BBoT ориентирован на него), Windows — не проверялся.
+- **Not strictly passive:** DNS resolution goes through the system resolvers and reaches the target's authoritative
+  name servers; the `http` module requests the target's web resources (without it there is no way to tell whether
+  a resource is alive). BBoT's active modules (port scanners, brute force, fuzzing) are archived and were not reviewed.
+- **A status is a snapshot taken during the scan:** resolution and HTTP answers depend on the resolver, caches,
+  geolocation and anti-bot protection.
+- **The checks are heuristics:** shared hosting is detected by the number of names on an IP and the network owner;
+  the placeholder email list is a heuristic; a Docker Hub profile owner is verified only by a link to a target domain
+  in the profile. IP validation (AS, anti-DDoS proxies, CDN) and port checks through third-party services are planned.
+- **Out-of-scope names without a proven relation are hidden:** a related domain reaches the results only if
+  `related_domains` promotes it (NS/MX/SPF/DMARC). WHOIS and certificate relations are not used yet.
+- **Source quotas:** many free tiers are small (e.g. hunter.io — 50 requests a month, VirusTotal — 500 a day);
+  the web server runs a deep health check once a day, which spends them too. Some sources do not work without a key.
+- **One scan at a time** when started from the UI; the running scan's status is kept in the server's memory.
+- Some upstream BBoT tests refer to archived modules and fail.
+- Tested on macOS; Linux should work the same (BBoT targets it), Windows is untested.
 
-## Структура
+## Layout
 
 ```
-bbot/            форк BBoT 3.0.2 (модули, ядро, тесты); bbot/modules_archive/ — модули вне активного набора
-bin/             osint (скан), web (интерфейс), module (набор модулей и ключи), healthcheck
-config/          bbot.yml — проектный конфиг; secrets.yml — ключи (не в git), secrets.example.yml — шаблон
+bbot/            BBoT 3.0.2 fork (modules, core, tests); bbot/modules_archive/ — modules outside the active set
+bin/             osint (scan), web (UI), module (module set and keys), healthcheck
+config/          bbot.yml — project config; secrets.yml — API keys (not in git), secrets.example.yml — template
 web/             server.py, scans.py, validity.py, apikeys.py, health.py, index.html
-scans/           результаты сканов (не в git)
+scans/           scan results (not in git)
 ```
 
-## Лицензия
+## License
 
-AGPL-3.0, как и BBoT (`LICENSE`). Tokosint — модифицированная версия BBoT 3.0.2 © Black Lantern Security;
-изменения: слой валидации, набор и доработки модулей, веб-интерфейс и скрипты запуска.
+AGPL-3.0, same as BBoT (`LICENSE`). Tokosint is a modified version of BBoT 3.0.2 © Black Lantern Security;
+changes: the validation layer, the module set and module fixes, the web interface and launcher scripts.

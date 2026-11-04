@@ -15,7 +15,7 @@ def ndjson(*records):
 class TestRobtex(ModuleTestBase):
     targets = ["blacklanternsecurity.com", "1.2.3.4", "5.6.7.8"]
     config_overrides = {
-        # фильтр shared hosting самого модуля; имена вне скоупа validity скрывает (D-021), здесь это не проверяется
+        # tests the module's own shared-hosting filter; validity hides unproven out-of-scope names, not tested here
         "modules": {
             "robtex": {"requests_per_minute": 6000, "max_reverse_names": 2},
             "validity": {"relation_check": False},

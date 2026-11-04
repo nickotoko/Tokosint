@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -138,69 +138,69 @@
 <header>
   <h1>Tokosint</h1>
   <nav>
-    <button id="tab-results" class="on">Анализ</button>
-    <button id="tab-sources">Источники</button>
-    <button id="tab-keys">Ключи</button>
+    <button id="tab-results" class="on">Analysis</button>
+    <button id="tab-sources">Sources</button>
+    <button id="tab-keys">Keys</button>
   </nav>
-  <a class="theme" id="theme">тема</a>
+  <a class="theme" id="theme">theme</a>
 </header>
 <main>
   <section id="view-sources" hidden>
     <div class="bar">
-      <input type="search" id="s-q" placeholder="Поиск по имени и описанию…" />
-      <select id="s-flag"><option value="">все флаги</option></select>
-      <select id="s-event"><option value="">любое событие (вход/выход)</option></select>
+      <input type="search" id="s-q" placeholder="Search by name or description…" />
+      <select id="s-flag"><option value="">all flags</option></select>
+      <select id="s-event"><option value="">any event (in/out)</option></select>
       <select id="s-auth">
-        <option value="">ключ: любой</option>
-        <option value="no">без ключа</option>
-        <option value="yes">нужен ключ</option>
+        <option value="">key: any</option>
+        <option value="no">no key</option>
+        <option value="yes">key required</option>
       </select>
       <select id="s-status">
-        <option value="">статус: любой</option>
-        <option value="ok">отдаёт данные</option>
-        <option value="nodata">без данных</option>
-        <option value="down">не работает</option>
-        <option value="nokey">нет ключа</option>
-        <option value="local">локальный</option>
+        <option value="">status: any</option>
+        <option value="ok">returns data</option>
+        <option value="nodata">no data</option>
+        <option value="down">down</option>
+        <option value="nokey">no key</option>
+        <option value="local">local</option>
       </select>
       <select id="s-fresh">
-        <option value="">актуальность: любая</option>
-        <option value="current">актуальные данные</option>
-        <option value="historical">исторические данные</option>
-        <option value="inherit">производные</option>
+        <option value="">freshness: any</option>
+        <option value="current">current data</option>
+        <option value="historical">historical data</option>
+        <option value="inherit">derived</option>
       </select>
       <span class="count" id="s-count"></span>
     </div>
     <div class="tablewrap"><table id="s-table"><thead><tr>
-      <th class="sortable" data-k="name">Источник</th>
-      <th>Данные на вход</th>
-      <th>Данные на выход</th>
-      <th class="sortable" data-k="auth_required">Ключ</th>
-      <th class="sortable" data-k="freshness">Актуальность</th>
-      <th class="sortable" data-k="status">Статус</th>
+      <th class="sortable" data-k="name">Source</th>
+      <th>Input</th>
+      <th>Output</th>
+      <th class="sortable" data-k="auth_required">Key</th>
+      <th class="sortable" data-k="freshness">Freshness</th>
+      <th class="sortable" data-k="status">Status</th>
     </tr></thead><tbody id="s-body"></tbody></table></div>
     <div class="count" id="s-health" style="margin-top:10px"></div>
   </section>
 
   <section id="view-results">
     <div class="bar">
-      <button class="btn primary" id="r-new">＋ Новый скан</button>
-      <select id="r-scan"><option value="">— выберите скан —</option></select>
-      <button class="btn" id="r-report" disabled>Отчёт по источникам</button>
-      <input type="search" id="r-q" placeholder="Поиск по активу…" />
-      <select id="r-type"><option value="">все типы</option></select>
-      <select id="r-source"><option value="">все источники</option></select>
+      <button class="btn primary" id="r-new">＋ New scan</button>
+      <select id="r-scan"><option value="">— choose a scan —</option></select>
+      <button class="btn" id="r-report" disabled>Source report</button>
+      <input type="search" id="r-q" placeholder="Search findings…" />
+      <select id="r-type"><option value="">all types</option></select>
+      <select id="r-source"><option value="">all sources</option></select>
       <select id="r-status">
-        <option value="">статус: любой</option>
-        <option value="valid">валидные</option>
-        <option value="historical">исторические</option>
-        <option value="false">ложные</option>
-        <option value="none">без разметки</option>
+        <option value="">status: any</option>
+        <option value="valid">valid</option>
+        <option value="historical">historical</option>
+        <option value="false">false</option>
+        <option value="none">untagged</option>
       </select>
       <select id="r-owner">
-        <option value="">принадлежность: любая</option>
-        <option value="own">активы цели</option>
-        <option value="third">третья сторона</option>
+        <option value="">ownership: any</option>
+        <option value="own">target assets</option>
+        <option value="third">third party</option>
       </select>
       <span class="count" id="r-count"></span>
     </div>
@@ -208,37 +208,37 @@
       <div class="job-head">
         <span class="spin" id="job-spin"></span>
         <span class="grow" id="job-title"></span>
-        <button class="btn" id="job-open" hidden>Открыть результаты</button>
-        <button class="btn danger" id="job-stop">Остановить</button>
-        <button class="x" id="job-hide" title="Скрыть" hidden>&times;</button>
+        <button class="btn" id="job-open" hidden>Open results</button>
+        <button class="btn danger" id="job-stop">Stop</button>
+        <button class="x" id="job-hide" title="Hide" hidden>&times;</button>
       </div>
       <pre id="job-log"></pre>
     </div>
     <div class="tablewrap"><table id="r-table"><thead><tr>
-      <th class="sortable" data-k="type">Тип актива</th>
-      <th class="sortable" data-k="data">Актив</th>
-      <th class="sortable" data-k="nsources">Источники</th>
-      <th class="sortable" data-k="status">Статус</th>
-      <th class="sortable" data-k="seen">Наблюдался</th>
+      <th class="sortable" data-k="type">Type</th>
+      <th class="sortable" data-k="data">Finding</th>
+      <th class="sortable" data-k="nsources">Sources</th>
+      <th class="sortable" data-k="status">Status</th>
+      <th class="sortable" data-k="seen">Last seen</th>
     </tr></thead><tbody id="r-body"></tbody></table></div>
-    <div class="empty" id="r-empty">Выберите скан, чтобы увидеть активы.</div>
+    <div class="empty" id="r-empty">Choose a scan to see its findings.</div>
   </section>
   <section id="view-keys" hidden>
     <div class="bar">
-      <input type="search" id="k-q" placeholder="Поиск по источнику…" />
+      <input type="search" id="k-q" placeholder="Search by source…" />
       <select id="k-state">
-        <option value="">все</option>
-        <option value="set">заданные</option>
-        <option value="unset">не заданные</option>
-        <option value="need">обязательные, но не заданные</option>
+        <option value="">all</option>
+        <option value="set">set</option>
+        <option value="unset">not set</option>
+        <option value="need">required but not set</option>
       </select>
       <span class="count" id="k-count"></span>
     </div>
     <div class="tablewrap"><table id="k-table"><thead><tr>
-      <th>Источник</th><th>Поле</th><th>Описание</th><th>Ключ</th><th></th>
+      <th>Source</th><th>Field</th><th>Description</th><th>Key</th><th></th>
     </tr></thead><tbody id="k-body"></tbody></table></div>
-    <div class="count" style="margin-top:10px">Ключи хранятся в <code>config/secrets.yml</code> (права 600) и подхватываются
-      при следующем запуске скана. Значения в интерфейс не возвращаются — видна только маска.</div>
+    <div class="count" style="margin-top:10px">Keys are stored in <code>config/secrets.yml</code> (mode 600) and are picked up
+      by the next scan. Values are never sent back to the UI, only a mask.</div>
   </section>
 </main>
 
@@ -248,28 +248,28 @@
 </dialog>
 
 <dialog id="dlg-scan">
-  <div class="dlg-head"><h2>Новый скан</h2><button class="x" id="scan-x">&times;</button></div>
+  <div class="dlg-head"><h2>New scan</h2><button class="x" id="scan-x">&times;</button></div>
   <div class="dlg-body form">
-    <label for="scan-targets">Цели</label>
+    <label for="scan-targets">Targets</label>
     <textarea id="scan-targets" placeholder="target.example&#10;related.example&#10;198.51.100.0/24"></textarea>
-    <div class="hint">Домены, IP или подсети — по одной на строку (или через пробел/запятую), до 20.</div>
-    <label for="scan-name">Имя скана</label>
-    <input type="text" id="scan-name" placeholder="по умолчанию — первая цель и время" />
-    <div class="hint">Латиница в нижнем регистре, цифры, _ и -. Результаты — в <code>scans/&lt;имя&gt;/</code>.</div>
-    <label for="scan-mode">Источники</label>
+    <div class="hint">Domains, IPs or networks, one per line (or separated by spaces/commas), up to 20.</div>
+    <label for="scan-name">Scan name</label>
+    <input type="text" id="scan-name" placeholder="default: first target and time" />
+    <div class="hint">Lowercase latin letters, digits, _ and -. Results go to <code>scans/&lt;name&gt;/</code>.</div>
+    <label for="scan-mode">Sources</label>
     <select id="scan-mode">
-      <option value="all">весь пассивный набор (-f passive)</option>
-      <option value="pick">выбрать источники</option>
+      <option value="all">the whole passive set (-f passive)</option>
+      <option value="pick">pick sources</option>
     </select>
     <div id="scan-pick" hidden>
       <div class="srcgrid" id="scan-sources"></div>
       <div class="hint" id="scan-pick-count"></div>
     </div>
-    <div class="hint">Запросы идут к сторонним источникам и тратят их квоты. Одновременно — один скан.</div>
+    <div class="hint">Requests go to third-party sources and spend their quotas. One scan at a time.</div>
     <div class="actions">
       <span class="err" id="scan-err"></span>
-      <button class="btn" id="scan-cancel">Отмена</button>
-      <button class="btn primary" id="scan-go">Запустить</button>
+      <button class="btn" id="scan-cancel">Cancel</button>
+      <button class="btn primary" id="scan-go">Start</button>
     </div>
   </div>
 </dialog>
@@ -284,7 +284,7 @@ const $ = (s) => document.querySelector(s);
 const el = (t, cls, txt) => { const e = document.createElement(t); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 const chips = (td, items, cls) => (items.length ? items : ["—"]).forEach((x) => td.appendChild(el("span", "chip " + (cls || ""), x)));
 
-// ---- тема ----
+// ---- theme ----
 $("#theme").onclick = () => {
   const r = document.documentElement, cur = r.getAttribute("data-theme");
   const next = cur === "dark" ? "light" : cur === "light" ? "" : "dark";
@@ -293,7 +293,7 @@ $("#theme").onclick = () => {
 };
 try { const t = localStorage.getItem("theme"); if (t) document.documentElement.setAttribute("data-theme", t); } catch (e) {}
 
-// ---- вкладки ----
+// ---- tabs ----
 function show(which) {
   for (const v of ["results", "sources", "keys"]) {
     $("#view-" + v).hidden = v !== which;
@@ -310,10 +310,10 @@ function fillSelect(sel, values, keepFirst = true) {
   for (const v of values) { const o = el("option", null, v); o.value = v; sel.appendChild(o); }
 }
 
-// ================= ИСТОЧНИКИ =================
+// ================= SOURCES =================
 let SOURCES = [], HEALTH = {}, sSort = { k: "name", dir: 1 };
-const ST_LABEL = { ok: "отдаёт данные", nodata: "без данных", down: "не работает", nokey: "нет ключа", local: "локальный", unknown: "—", none: "—" };
-const FRESH_LABEL = { current: "актуальные", historical: "исторические", inherit: "производные" };
+const ST_LABEL = { ok: "returns data", nodata: "no data", down: "down", nokey: "no key", local: "local", unknown: "—", none: "—" };
+const FRESH_LABEL = { current: "current", historical: "historical", inherit: "derived" };
 const FRESH_CLS = { current: "valid", historical: "historical", inherit: "local" };
 const statusOf = (name) => (HEALTH[name] && HEALTH[name].status) || "none";
 function renderSources() {
@@ -337,13 +337,13 @@ function renderSources() {
     tr.appendChild(el("td", "name", s.name));
     const tdIn = el("td"); chips(tdIn, s.watched_events, "in"); tr.appendChild(tdIn);
     const tdOut = el("td"); chips(tdOut, s.produced_events, "out"); tr.appendChild(tdOut);
-    const tdA = el("td"); tdA.appendChild(el("span", s.auth_required ? "yes" : "no", s.auth_required ? "🔑 нужен" : "нет")); tr.appendChild(tdA);
+    const tdA = el("td"); tdA.appendChild(el("span", s.auth_required ? "yes" : "no", s.auth_required ? "🔑 required" : "no")); tr.appendChild(tdA);
     const tdF = el("td"); tdF.appendChild(el("span", "st " + (FRESH_CLS[s.freshness] || ""), FRESH_LABEL[s.freshness] || "—")); tr.appendChild(tdF);
     const stt = statusOf(s.name); const tdS = el("td"); tdS.appendChild(el("span", "st " + stt, ST_LABEL[stt] || stt)); tr.appendChild(tdS);
     tr.onclick = () => openSource(s);
     body.appendChild(tr);
   }
-  $("#s-count").textContent = `${rows.length} из ${SOURCES.length}`;
+  $("#s-count").textContent = `${rows.length} of ${SOURCES.length}`;
 }
 function openSource(s) {
   $("#dlg-name").textContent = s.name;
@@ -351,21 +351,21 @@ function openSource(s) {
   const dl = el("dl");
   const dd = (node) => { dl.appendChild(node); };
   const row = (k, v) => { dl.appendChild(el("dt", null, k)); dl.appendChild(el("dd", null, v)); };
-  row("Описание", s.description || "—");
-  dl.appendChild(el("dt", null, "Данные на вход")); { const d = el("dd"); chips(d, s.watched_events, "in"); dd(d); }
-  dl.appendChild(el("dt", null, "Данные на выход")); { const d = el("dd"); chips(d, s.produced_events, "out"); dd(d); }
-  dl.appendChild(el("dt", null, "Флаги")); { const d = el("dd"); chips(d, s.flags, "flag"); dd(d); }
-  row("Нужен API-ключ", s.auth_required ? "да" : "нет");
-  row("Актуальность данных", FRESH_LABEL[s.freshness] || "не указана");
+  row("Description", s.description || "—");
+  dl.appendChild(el("dt", null, "Input")); { const d = el("dd"); chips(d, s.watched_events, "in"); dd(d); }
+  dl.appendChild(el("dt", null, "Output")); { const d = el("dd"); chips(d, s.produced_events, "out"); dd(d); }
+  dl.appendChild(el("dt", null, "Flags")); { const d = el("dd"); chips(d, s.flags, "flag"); dd(d); }
+  row("API key required", s.auth_required ? "yes" : "no");
+  row("Data freshness", FRESH_LABEL[s.freshness] || "not declared");
   const h = HEALTH[s.name];
   if (h) {
     const d = el("dd"); d.appendChild(el("span", "st " + h.status, ST_LABEL[h.status] || h.status));
     if (h.detail) d.appendChild(document.createTextNode(" " + h.detail));
-    dl.appendChild(el("dt", null, "Статус (хелчек)")); dl.appendChild(d);
-    if (h.checked_at) row("Проверено", new Date(h.checked_at * 1000).toLocaleString());
+    dl.appendChild(el("dt", null, "Status (health check)")); dl.appendChild(d);
+    if (h.checked_at) row("Checked", new Date(h.checked_at * 1000).toLocaleString());
   }
-  row("Квоты / лимиты", s.quota || "не задокументированы");
-  if (s.author) row("Автор", s.author);
+  row("Quotas / limits", s.quota || "not documented");
+  if (s.author) row("Author", s.author);
   b.appendChild(dl);
   $("#dlg").showModal();
 }
@@ -378,10 +378,10 @@ document.querySelectorAll("#s-table th.sortable").forEach((th) => th.onclick = (
 function loadHealth() {
   return fetch("/api/health").then((r) => r.json()).then((h) => {
     HEALTH = h.sources || {};
-    const ago = h.checked_at ? new Date(h.checked_at * 1000).toLocaleString() : "ещё не проверялось";
+    const ago = h.checked_at ? new Date(h.checked_at * 1000).toLocaleString() : "not checked yet";
     const c = {}; Object.values(HEALTH).forEach((r) => { c[r.status] = (c[r.status] || 0) + 1; });
     const parts = Object.entries(c).map(([k, v]) => `${ST_LABEL[k] || k}: ${v}`).join(" · ");
-    $("#s-health").textContent = `Хелчек: ${ago}${parts ? " — " + parts : ""}`;
+    $("#s-health").textContent = `Health check: ${ago}${parts ? " — " + parts : ""}`;
   }).catch(() => {});
 }
 fetch("/api/sources").then((r) => r.json()).then((data) => {
@@ -392,13 +392,13 @@ fetch("/api/sources").then((r) => r.json()).then((data) => {
   fillSelect($("#s-event"), [...events].sort());
   renderSources();
   loadHealth().then(renderSources);
-}).catch(() => { $("#s-body").innerHTML = '<tr><td colspan="6" class="empty">Нет данных. Запусти через <code>bin/web</code>.</td></tr>'; });
+}).catch(() => { $("#s-body").innerHTML = '<tr><td colspan="6" class="empty">No data. Start it with <code>bin/web</code>.</td></tr>'; });
 
-// ================= РЕЗУЛЬТАТЫ =================
-// по умолчанию — от активов с бОльшим числом источников к меньшему
+// ================= ANALYSIS =================
+// default order: findings with more sources first
 let ASSETS = [], rSort = { k: "nsources", dir: -1 };
-const IOC_LABEL = { valid: "валидно", historical: "исторически", false: "ложно" };
-const DNS_LABEL = { ok: "резолвится", nxdomain: "не резолвится", dangling: "висячий CNAME", wildcard: "wildcard", error: "ошибка DNS" };
+const IOC_LABEL = { valid: "valid", historical: "historical", false: "false" };
+const DNS_LABEL = { ok: "resolves", nxdomain: "does not resolve", dangling: "dangling CNAME", wildcard: "wildcard", error: "DNS error" };
 const dnsCheckOf = (a) => { const t = (a.tags || []).find((x) => x.startsWith("dns-check-")); return t ? t.slice(10) : null; };
 const isThird = (a) => (a.tags || []).includes("third-party");
 const IOC_RANK = { valid: 2, historical: 1, false: 0.5 };
@@ -436,19 +436,19 @@ function renderResults() {
     const dc = dnsCheckOf(a); if (dc && dc !== "ok") tdV.appendChild(el("div", "muted", DNS_LABEL[dc] || dc));
     if (a.status === "false" && a.false_reasons && a.false_reasons.length) {
       const fr = a.false_reasons[0];
-      tdV.appendChild(el("div", "muted", (fr.hidden ? "скрыто: " : "") + fr.reason));
+      tdV.appendChild(el("div", "muted", (fr.hidden ? "hidden: " : "") + fr.reason));
     }
-    if (isThird(a)) { const t = el("div", "muted", "третья сторона"); t.title = "провайдер из DNS-записей цели: связь актуальна, но это не актив цели"; tdV.appendChild(t); }
+    if (isThird(a)) { const t = el("div", "muted", "third party"); t.title = "a provider from the target's DNS records: the relation is current, but it is not a target asset"; tdV.appendChild(t); }
     tr.appendChild(tdV);
     const tdSeen = el("td", "seen", fmtSeen(a.seen)); tr.appendChild(tdSeen);
     tr.className = "click"; tr.onclick = () => openAsset(a);
     body.appendChild(tr);
   }
-  $("#r-count").textContent = `${rows.length} из ${ASSETS.length} активов`;
+  $("#r-count").textContent = `${rows.length} of ${ASSETS.length} findings`;
 }
 function loadScan(name) {
   if (!name) { ASSETS = []; renderResults(); return; }
-  $("#r-empty").textContent = "Загрузка…"; $("#r-empty").hidden = false; $("#r-body").innerHTML = "";
+  $("#r-empty").textContent = "Loading…"; $("#r-empty").hidden = false; $("#r-body").innerHTML = "";
   fetch("/api/scan/" + encodeURIComponent(name)).then((r) => r.json()).then((data) => {
     if (data.error) throw new Error(data.error);
     ASSETS = data.map((a) => ({ ...a, data: String(a.data) }));
@@ -461,9 +461,9 @@ function loadScan(name) {
       if (!o.dataset.label) o.dataset.label = o.textContent;
       o.textContent = o.value ? `${o.dataset.label} (${cnt[o.value] || 0})` : o.dataset.label;
     }
-    $("#r-empty").textContent = "Нет активов в этом скане.";
+    $("#r-empty").textContent = "No findings in this scan.";
     renderResults();
-  }).catch(() => { $("#r-empty").textContent = "Не удалось загрузить скан."; });
+  }).catch(() => { $("#r-empty").textContent = "Failed to load the scan."; });
 }
 $("#r-scan").onchange = () => loadScan($("#r-scan").value);
 ["r-q", "r-type", "r-source", "r-status", "r-owner"].forEach((id) => { $("#" + id).oninput = renderResults; });
@@ -477,50 +477,50 @@ function loadScanList(select) {
     while (sel.options.length > 1) sel.remove(1);
     for (const s of scans) {
       const d = new Date(s.mtime * 1000).toISOString().slice(0, 10);
-      const o = el("option", null, `${s.name} · ${s.events} событий · ${d}${s.running ? " · идёт" : ""}`);
+      const o = el("option", null, `${s.name} · ${s.events} events · ${d}${s.running ? " · running" : ""}`);
       o.value = s.name; sel.appendChild(o);
     }
     if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
     $("#r-report").disabled = !sel.value;
-    if (!scans.length && !ASSETS.length) $("#r-empty").textContent = "В scans/ нет сканов. Запустите новый.";
-  }).catch(() => { $("#r-empty").textContent = "Не удалось получить список сканов."; });
+    if (!scans.length && !ASSETS.length) $("#r-empty").textContent = "No scans in scans/. Start a new one.";
+  }).catch(() => { $("#r-empty").textContent = "Failed to get the scan list."; });
 }
 loadScanList();
 $("#r-scan").addEventListener("change", () => { $("#r-report").disabled = !$("#r-scan").value; });
 
-// ---------- карточка актива ----------
-const DETAIL_LABEL = { description: "Описание", severity: "Критичность", confidence: "Уверенность", url: "URL", host: "Хост",
-  path: "Путь", name: "Название", platform: "Платформа", profile_name: "Профиль", technology: "Технология", asn: "ASN",
-  country: "Страна", city: "Город", subnet: "Подсеть" };
+// ---------- finding details ----------
+const DETAIL_LABEL = { description: "Description", severity: "Severity", confidence: "Confidence", url: "URL", host: "Host",
+  path: "Path", name: "Name", platform: "Platform", profile_name: "Profile", technology: "Technology", asn: "ASN",
+  country: "Country", city: "City", subnet: "Subnet" };
 function openAsset(a) {
   $("#dlg-name").textContent = a.data.length > 80 ? a.data.slice(0, 80) + "…" : a.data;
   const b = $("#dlg-body"); b.innerHTML = "";
   const dl = el("dl");
   const row = (k, v) => { dl.appendChild(el("dt", null, k)); const d = el("dd"); if (v instanceof Node) d.appendChild(v); else d.textContent = v; dl.appendChild(d); };
-  row("Тип", a.type);
-  const st = el("span"); st.appendChild(el("span", "st " + (a.status || "none"), IOC_LABEL[a.status] || "без разметки"));
+  row("Type", a.type);
+  const st = el("span"); st.appendChild(el("span", "st " + (a.status || "none"), IOC_LABEL[a.status] || "untagged"));
   const dc = dnsCheckOf(a); if (dc) st.appendChild(document.createTextNode(" DNS: " + (DNS_LABEL[dc] || dc)));
-  if (isThird(a)) st.appendChild(document.createTextNode(" · третья сторона"));
-  row("Статус", st);
+  if (isThird(a)) st.appendChild(document.createTextNode(" · third party"));
+  row("Status", st);
   if (a.false_reasons && a.false_reasons.length) {
     const d = el("div"); a.false_reasons.forEach((r) => { const c = el("div", "ctx"); c.appendChild(el("b", null, r.module || "—"));
-      c.appendChild(document.createTextNode(": " + (r.hidden ? "скрыто — " : "отброшено — ") + r.reason)); d.appendChild(c); });
-    row("Почему ложное", d);
+      c.appendChild(document.createTextNode(": " + (r.hidden ? "hidden — " : "dropped — ") + r.reason)); d.appendChild(c); });
+    row("Why false", d);
   }
   for (const [k, v] of Object.entries(a.details || {})) row(DETAIL_LABEL[k] || k, v);
-  { const d = el("div"); chips(d, a.sources); row("Источники", d); }
+  { const d = el("div"); chips(d, a.sources); row("Sources", d); }
   if (a.contexts && a.contexts.length) {
     const d = el("div"); a.contexts.forEach((c) => { const x = el("div", "ctx"); x.appendChild(el("b", null, c.module || "—"));
       x.appendChild(document.createTextNode(": " + c.context)); d.appendChild(x); });
-    row("Как найдено", d);
+    row("How it was found", d);
   }
-  row("Наблюдался", fmtSeen(a.seen));
-  { const d = el("div"); chips(d, a.tags || [], "flag"); row("Теги", d); }
+  row("Last seen", fmtSeen(a.seen));
+  { const d = el("div"); chips(d, a.tags || [], "flag"); row("Tags", d); }
   b.appendChild(dl);
   $("#dlg").showModal();
 }
 
-// ---------- ключи API ----------
+// ---------- API keys ----------
 let KEYS = [];
 function renderKeys() {
   const q = $("#k-q").value.trim().toLowerCase(), stt = $("#k-state").value, body = $("#k-body");
@@ -531,12 +531,12 @@ function renderKeys() {
     const tr = el("tr");
     tr.appendChild(el("td", "name", k.module));
     tr.appendChild(el("td", "name", k.field));
-    tr.appendChild(el("td", null, (k.desc || "—") + (k.mandatory ? " · обязательный" : " · необязательный")));
-    const tdV = el("td"); tdV.appendChild(el("span", "st " + (k.set ? "ok" : (k.mandatory ? "nokey" : "none")), k.set ? (k.masked || "задан") : "не задан"));
+    tr.appendChild(el("td", null, (k.desc || "—") + (k.mandatory ? " · required" : " · optional")));
+    const tdV = el("td"); tdV.appendChild(el("span", "st " + (k.set ? "ok" : (k.mandatory ? "nokey" : "none")), k.set ? (k.masked || "set") : "not set"));
     tr.appendChild(tdV);
     const tdA = el("td"); const form = el("div", "keyform");
-    const inp = el("input"); inp.type = "password"; inp.placeholder = k.set ? "новое значение" : "значение ключа"; inp.autocomplete = "off";
-    const save = el("button", "btn sm primary", k.set ? "Изменить" : "Добавить");
+    const inp = el("input"); inp.type = "password"; inp.placeholder = k.set ? "new value" : "key value"; inp.autocomplete = "off";
+    const save = el("button", "btn sm primary", k.set ? "Change" : "Add");
     save.onclick = () => {
       if (!inp.value.trim()) { inp.focus(); return; }
       save.disabled = true;
@@ -546,9 +546,9 @@ function renderKeys() {
     inp.onkeydown = (ev) => { if (ev.key === "Enter") save.click(); };
     form.appendChild(inp); form.appendChild(save);
     if (k.set) {
-      const del = el("button", "btn sm danger", "Удалить");
+      const del = el("button", "btn sm danger", "Delete");
       del.onclick = () => {
-        if (!confirm(`Удалить ключ ${k.module}.${k.field}?`)) return;
+        if (!confirm(`Delete key ${k.module}.${k.field}?`)) return;
         postJSON("/api/keys/delete", { module: k.module, field: k.field })
           .then((d) => { KEYS = d; renderKeys(); }).catch((e) => alert(e.message));
       };
@@ -558,20 +558,20 @@ function renderKeys() {
     body.appendChild(tr);
   }
   const set = KEYS.filter((k) => k.set).length;
-  $("#k-count").textContent = `${rows.length} из ${KEYS.length} · задано ${set}`;
+  $("#k-count").textContent = `${rows.length} of ${KEYS.length} · ${set} set`;
 }
 function loadKeys() {
   fetch("/api/keys").then((r) => r.json()).then((d) => { if (d.error) throw new Error(d.error); KEYS = d; renderKeys(); })
-    .catch((e) => { $("#k-body").innerHTML = ""; $("#k-count").textContent = "Не удалось загрузить ключи: " + e.message; });
+    .catch((e) => { $("#k-body").innerHTML = ""; $("#k-count").textContent = "Failed to load keys: " + e.message; });
 }
 ["k-q", "k-state"].forEach((id) => { $("#" + id).oninput = renderKeys; });
 
-// ---------- запуск скана ----------
+// ---------- starting a scan ----------
 const postJSON = (url, body) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) })
   .then((r) => r.json().then((d) => { if (!r.ok) throw new Error(d.error || r.statusText); return d; }));
 function renderPickCount() {
   const n = document.querySelectorAll("#scan-sources input:checked").length;
-  $("#scan-pick-count").textContent = `выбрано: ${n}`;
+  $("#scan-pick-count").textContent = `selected: ${n}`;
 }
 $("#r-new").onclick = () => {
   const grid = $("#scan-sources");
@@ -588,7 +588,7 @@ $("#scan-mode").onchange = () => { $("#scan-pick").hidden = $("#scan-mode").valu
 $("#scan-x").onclick = $("#scan-cancel").onclick = () => $("#dlg-scan").close();
 $("#scan-go").onclick = () => {
   const modules = $("#scan-mode").value === "pick" ? [...document.querySelectorAll("#scan-sources input:checked")].map((c) => c.value) : [];
-  if ($("#scan-mode").value === "pick" && !modules.length) { $("#scan-err").textContent = "Выберите хотя бы один источник."; return; }
+  if ($("#scan-mode").value === "pick" && !modules.length) { $("#scan-err").textContent = "Pick at least one source."; return; }
   $("#scan-go").disabled = true; $("#scan-err").textContent = "";
   postJSON("/api/scans/start", { targets: $("#scan-targets").value, name: $("#scan-name").value.trim(), modules })
     .then((job) => { $("#dlg-scan").close(); $("#scan-targets").value = ""; $("#scan-name").value = ""; renderJob(job); pollJobs(); })
@@ -596,21 +596,21 @@ $("#scan-go").onclick = () => {
     .finally(() => { $("#scan-go").disabled = false; });
 };
 
-// ---------- текущий скан ----------
+// ---------- running scan ----------
 let JOB = null, jobTimer = null, jobHidden = null;
-const fmtDur = (sec) => { sec = Math.max(0, Math.round(sec)); const m = Math.floor(sec / 60); return m ? `${m} мин ${sec % 60} с` : `${sec} с`; };
+const fmtDur = (sec) => { sec = Math.max(0, Math.round(sec)); const m = Math.floor(sec / 60); return m ? `${m} min ${sec % 60} s` : `${sec} s`; };
 function renderJob(j) {
   JOB = j;
   const box = $("#r-job");
   if (!j || jobHidden === j.name) { box.hidden = true; return; }
   box.hidden = false;
   const tg = j.targets.join(", ");
-  const src = j.modules.length ? `${j.modules.length} источн.` : "весь пассивный набор";
+  const src = j.modules.length ? `${j.modules.length} sources` : "the whole passive set";
   if (j.running) {
-    $("#job-title").textContent = `${j.stopping ? "Останавливается" : "Идёт"} скан ${j.name}: ${tg} · ${src} · ${fmtDur(Date.now() / 1000 - j.started)}`;
+    $("#job-title").textContent = `${j.stopping ? "Stopping" : "Running"} scan ${j.name}: ${tg} · ${src} · ${fmtDur(Date.now() / 1000 - j.started)}`;
   } else {
     const ok = j.returncode === 0;
-    $("#job-title").textContent = `Скан ${j.name} ${ok ? "завершён" : `завершился с кодом ${j.returncode}`}: ${tg}`;
+    $("#job-title").textContent = `Scan ${j.name} ${ok ? "finished" : `exited with code ${j.returncode}`}: ${tg}`;
   }
   $("#job-spin").hidden = !j.running;
   $("#job-stop").hidden = !j.running; $("#job-stop").disabled = !!j.stopping;
@@ -633,8 +633,8 @@ $("#job-hide").onclick = () => { if (JOB) { jobHidden = JOB.name; renderJob(JOB)
 $("#job-open").onclick = () => { if (!JOB) return; const n = JOB.name; loadScanList(n).then(() => { $("#r-scan").value = n; $("#r-report").disabled = false; loadScan(n); }); };
 pollJobs();
 
-// ---------- отчёт по источникам ----------
-const REP_STATE = { ok: "нашёл данные", nodata: "без данных", failed: "не стартовал", error: "ошибка в работе" };
+// ---------- source report ----------
+const REP_STATE = { ok: "found data", nodata: "no data", failed: "did not start", error: "runtime error" };
 const REP_STATE_CLS = { ok: "ok", nodata: "nodata", failed: "failed", error: "error" };
 let REPORT = null, repSort = { k: "assets", dir: -1 };
 const fmtTs = (ts) => ts ? fmtSeen(ts) : "—";
@@ -648,35 +648,35 @@ function renderReport() {
   const meta = el("div", "rep-meta");
   meta.innerHTML = "";
   const addMeta = (k, v) => { meta.appendChild(document.createTextNode(k + " ")); meta.appendChild(el("b", null, v)); meta.appendChild(document.createTextNode("   ")); };
-  addMeta("Цели:", (r.targets || []).join(", ") || "—");
-  addMeta("Начат:", fmtTs(r.started_at));
-  addMeta("Длительность:", r.duration || "—");
-  addMeta("Статус:", r.status || "—");
+  addMeta("Targets:", (r.targets || []).join(", ") || "—");
+  addMeta("Started:", fmtTs(r.started_at));
+  addMeta("Duration:", r.duration || "—");
+  addMeta("Status:", r.status || "—");
   b.appendChild(meta);
 
   const k = el("div", "kpis");
   const kpi = (v, label) => { const d = el("div", "kpi"); d.appendChild(el("div", "v", String(v))); d.appendChild(el("div", "k", label)); k.appendChild(d); };
   const active = r.sources.filter((s) => s.state === "ok").length;
-  kpi(r.assets, "уникальных активов");
-  kpi(`${active} / ${r.sources.length}`, "источников нашли данные");
-  kpi(r.by_status.valid || 0, "валидных");
-  kpi(r.by_status.historical || 0, "исторических");
-  kpi(r.third_party || 0, "инфраструктура третьей стороны");
-  kpi(r.false || 0, "отброшено как ложные");
+  kpi(r.assets, "unique findings");
+  kpi(`${active} / ${r.sources.length}`, "sources found data");
+  kpi(r.by_status.valid || 0, "valid");
+  kpi(r.by_status.historical || 0, "historical");
+  kpi(r.third_party || 0, "third-party infrastructure");
+  kpi(r.false || 0, "dropped as false");
   b.appendChild(k);
 
   const types = el("div"); types.style.marginBottom = "10px"; typeChips(types, r.by_type); b.appendChild(types);
   const dnsEnt = Object.entries(r.dns_check || {});
   if (dnsEnt.length) {
     const dns = el("div"); dns.style.marginBottom = "14px";
-    dns.appendChild(el("span", "muted", "DNS-проверка имён: "));
+    dns.appendChild(el("span", "muted", "DNS check of names: "));
     const named = {}; dnsEnt.forEach(([k, v]) => { named[DNS_LABEL[k] || k] = v; }); typeChips(dns, named);
     b.appendChild(dns);
   }
 
   const wrap = el("div", "tablewrap"); const t = el("table"); const th = el("thead"); const hr = el("tr");
-  const cols = [["name", "Источник"], ["state", "Состояние"], ["assets", "Активов", "num"], ["only", "Только здесь", "num"],
-    [null, "Какие данные"], ["valid", "Валидно", "num"], ["historical", "Истор.", "num"], ["false", "Ложных", "num"]];
+  const cols = [["name", "Source"], ["state", "State"], ["assets", "Findings", "num"], ["only", "Only here", "num"],
+    [null, "What data"], ["valid", "Valid", "num"], ["historical", "Hist.", "num"], ["false", "False", "num"]];
   cols.forEach(([key, label, cls]) => {
     const h = el("th", (key ? "sortable " : "") + (cls || ""), label + (repSort.k === key ? (repSort.dir > 0 ? " ↑" : " ↓") : ""));
     if (key) h.onclick = () => { repSort.dir = repSort.k === key ? -repSort.dir : (key === "name" || key === "state" ? 1 : -1); repSort.k = key; renderReport(); };
@@ -705,19 +705,19 @@ function renderReport() {
     tb.appendChild(tr);
   }
   t.appendChild(tb); wrap.appendChild(t); b.appendChild(wrap);
-  b.appendChild(el("div", "count", "Активов — уникальных (тип + значение) от источника; «только здесь» — не подтверждён ни одним другим источником. " +
-    "Валидно/истор. — итоговый статус сущности по всем путям. dnsresolve — записи живого DNS-резолва." +
-    (r.has_console ? "" : " Лога консоли нет: источники без данных и ошибки старта не показаны.")));
+  b.appendChild(el("div", "count", "Findings: unique (type + value) per source; only here: not confirmed by any other source. " +
+    "Valid/hist.: the final status of the finding across all paths. dnsresolve: records from live DNS resolution." +
+    (r.has_console ? "" : " No console log: sources without data and setup errors are not shown.")));
   b.lastChild.style.marginTop = "10px";
 }
 $("#r-report").onclick = () => {
   const name = $("#r-scan").value; if (!name) return;
-  $("#rep-name").textContent = `Отчёт: ${name}`; $("#rep-body").innerHTML = '<div class="empty">Загрузка…</div>';
+  $("#rep-name").textContent = `Report: ${name}`; $("#rep-body").innerHTML = '<div class="empty">Loading…</div>';
   $("#dlg-report").showModal();
   fetch("/api/report/" + encodeURIComponent(name)).then((r) => r.json()).then((d) => {
     if (d.error) throw new Error(d.error);
     REPORT = d; renderReport();
-  }).catch((e) => { $("#rep-body").innerHTML = ""; $("#rep-body").appendChild(el("div", "empty", "Не удалось построить отчёт: " + e.message)); });
+  }).catch((e) => { $("#rep-body").innerHTML = ""; $("#rep-body").appendChild(el("div", "empty", "Failed to build the report: " + e.message)); });
 };
 $("#rep-x").onclick = () => $("#dlg-report").close();
 </script>

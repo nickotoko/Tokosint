@@ -1,4 +1,4 @@
-"""Тест пересчёта статуса по графу наблюдений: `bbot/.venv/bin/pytest web/test_validity.py -q`."""
+"""Tests for the graph status recompute: `bbot/.venv/bin/pytest web/test_validity.py -q`."""
 
 from validity import compute_status
 
@@ -26,7 +26,7 @@ def test_historical_parent_caps_children():
 
 
 def test_entity_upgraded_by_second_path():
-    # old пришёл сначала из архива, его IP получил historical; затем то же имя — из актуального источника
+    # 'old' first came from an archive and its IP got historical; then the same name came from a current source
     events = [
         SCAN,
         ev("D:seed", "SCAN:1", "current", "valid"),
@@ -36,7 +36,7 @@ def test_entity_upgraded_by_second_path():
     ]
     st = compute_status(events)
     assert st["D:old"] == "valid"
-    # потомок пересчитан по новому пути родителя
+    # the child is recomputed through the parent's new path
     assert st["IP:old"] == "valid"
 
 
@@ -73,7 +73,7 @@ def test_false_observation_and_its_children():
         ev("D:seed", "SCAN:1", "current", "valid"),
         ev("D:ext", "D:seed", "false", "false"),
         ev("IP:ext", "D:ext", "current", "false", "IP_ADDRESS"),
-        # то же имя позже продвинуто (related_domains) — валидно по второму пути
+        # the same name was promoted later (related_domains): valid through the second path
         ev("D:rel", "D:seed", "false", "false"),
         ev("D:rel", "D:seed", "verified", "valid"),
     ]

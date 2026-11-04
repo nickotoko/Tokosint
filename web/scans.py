@@ -1,6 +1,6 @@
-"""Сканы в scans/: список, активы, отчёт по источникам и запуск новых сканов через bin/osint.
+"""Scans in scans/: list, findings, per-source report and starting new scans through bin/osint.
 
-Стандартная библиотека, без зависимостей. Данные реальных целей остаются в scans/ (в .gitignore).
+Standard library only. Scan data stays in scans/ (gitignored).
 """
 
 import contextlib
@@ -29,10 +29,10 @@ ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 STATUS_RANK = {None: -1, "false": 0, "historical": 1, "valid": 2}
 
 
-# ---------- чтение скана ----------
+# ---------- reading a scan ----------
 
 def safe_scan_dir(name):
-    """Каталог скана в scans/; защита от обхода каталога."""
+    """Scan directory inside scans/; protects against path traversal."""
     if not name or "/" in name or "\\" in name or name.startswith("."):
         return None
     d = SCANS_DIR / name
@@ -66,7 +66,7 @@ def read_events(path):
 
 
 def asset_data(e):
-    """Строковое представление актива события (для словарей — host/url/name/…)."""
+    """String form of an event's finding (for dicts - host/url/name/...)."""
     d = e.get("data")
     if d is None:
         d = e.get("data_json")
@@ -74,13 +74,13 @@ def asset_data(e):
         return None
     if isinstance(d, str):
         return d
-    # всегда строка: у ASN значение — число, а фронт сортирует и ищет по строкам
+    # always a string: ASN data is a number, while the UI sorts and searches strings
     v = d.get("host") or d.get("url") or d.get("name") or d.get("asn") or d.get("ip") or d.get("description")
     return str(v) if v is not None else json.dumps(d, ensure_ascii=False)
 
 
 def source_name(module):
-    """Записи DNS (A, NS, MX…) приходят от фиктивных модулей — это живой резолв dnsresolve."""
+    """DNS records (A, NS, MX...) come from dummy modules - this is dnsresolve's live resolution."""
     if module and module != "SEED" and module.isupper():
         return "dnsresolve"
     return module
@@ -92,7 +92,7 @@ MAX_CONTEXTS = 12
 
 
 def event_details(e):
-    """Поля словарного события, объясняющие находку (для FINDING — description/severity), строками."""
+    """Fields of a dict event that explain the finding (for FINDING - description/severity), as strings."""
     d = e.get("data_json")
     if not isinstance(d, dict):
         d = e.get("data") if isinstance(e.get("data"), dict) else None
@@ -102,17 +102,17 @@ def event_details(e):
 
 
 def read_false(path):
-    """Журнал ложных находок скана (validity_false.jsonl рядом с output.json)."""
+    """The scan's false findings log (validity_false.jsonl next to output.json)."""
     log = Path(path).parent / "validity_false.jsonl"
     return read_events(log) if log.is_file() else []
 
 
 def aggregate_scan(path, with_false=True):
-    """JSONL скана → список активов [{type, data, sources, tags, seen, status, details, contexts, false_reasons}].
+    """Scan JSONL -> list of findings [{type, data, sources, tags, seen, status, details, contexts, false_reasons}].
 
-    status — valid / historical / false по всем путям обнаружения (web/validity.py), None — скан без разметки.
-    with_false — добавить ложные находки из validity_false.jsonl (в вывод скана они не попадают): со статусом false,
-    если по другим путям сущность не подтвердилась, и с причиной в false_reasons."""
+    status - valid / historical / false across all discovery paths (web/validity.py), None - an untagged scan.
+    with_false - add false findings from validity_false.jsonl (they are not in the scan output): status false
+    unless another path confirmed the finding, with the reason in false_reasons."""
     events = read_events(path)
     status = compute_status(events)
     by_key = {}
@@ -161,7 +161,7 @@ def aggregate_scan(path, with_false=True):
             module = r.get("module")
             if module:
                 a["sources"].add(module)
-            reason = r.get("reason") or "потомок ложной находки"
+            reason = r.get("reason") or "descendant of a false finding"
             entry = {"module": module, "reason": reason, "hidden": bool(r.get("hidden"))}
             if entry not in a["false_reasons"] and len(a["false_reasons"]) < MAX_CONTEXTS:
                 a["false_reasons"].append(entry)
@@ -170,7 +170,7 @@ def aggregate_scan(path, with_false=True):
     for a in by_key.values():
         tags = a["tags"]
         if "in-scope" in tags:
-            # имя, позже вошедшее в скоуп (продвинутый related_domains домен), — не третья сторона
+            # a name that entered scope later (a domain promoted by related_domains) is not a third party
             tags.discard("third-party")
         out.append({
             "type": a["type"],
@@ -187,7 +187,7 @@ def aggregate_scan(path, with_false=True):
     return out
 
 
-# ---------- отчёт по источникам ----------
+# ---------- per-source report ----------
 
 def _console_log(name):
     p = SCANS_DIR / f"{name}.console.log"
@@ -195,7 +195,7 @@ def _console_log(name):
 
 
 def parse_console(path):
-    """Из консольного лога BBoT: загруженные модули, soft-fail при старте, error state в работе."""
+    """From the BBoT console log: loaded modules, setup soft-fails, runtime error states."""
     loaded, failed, errored = [], {}, {}
     if path is None:
         return loaded, failed, errored
@@ -217,10 +217,10 @@ def parse_console(path):
 
 
 def scan_report(name, producers=None):
-    """Сколько и каких данных нашёл каждый источник скана.
+    """What and how much each source of the scan found.
 
-    producers — имена модулей, которые вообще выдают данные: загруженные модули вне этого набора
-    (отчётные, вроде affiliates) без находок в отчёт не попадают."""
+    producers - modules that emit data at all: loaded modules outside this set
+    (report modules such as affiliates) are left out of the report when they found nothing."""
     d = safe_scan_dir(name)
     path = d / "output.json" if d else None
     if path is None or not path.is_file():
@@ -320,7 +320,7 @@ def scan_report(name, producers=None):
     }
 
 
-# ---------- запуск сканов ----------
+# ---------- starting scans ----------
 
 class ScanError(Exception):
     def __init__(self, msg, code=400):
@@ -328,12 +328,12 @@ class ScanError(Exception):
         self.code = code
 
 
-_jobs = {}  # имя скана -> {"proc", "targets", "started", "log"}
+_jobs = {}  # scan name -> {"proc", "targets", "started", "log"}
 _lock = threading.Lock()
 
 
 def parse_targets(raw):
-    """Домены и IP/CIDR; всё остальное отклоняется (в командную строку попадает только проверенное)."""
+    """Domains and IPs/CIDRs; anything else is rejected (only validated values reach the command line)."""
     items = raw if isinstance(raw, list) else re.split(r"[\s,;]+", str(raw or ""))
     out = []
     for t in items:
@@ -347,27 +347,27 @@ def parse_targets(raw):
             pass
         t = t.removeprefix("*.")
         if not DOMAIN_RE.match(t):
-            raise ScanError(f"не домен и не IP: {t[:80]}")
+            raise ScanError(f"not a domain or IP: {t[:80]}")
         out.append(t)
     out = list(dict.fromkeys(out))
     if not out:
-        raise ScanError("не указаны цели")
+        raise ScanError("no targets given")
     if len(out) > MAX_TARGETS:
-        raise ScanError(f"не больше {MAX_TARGETS} целей за скан")
+        raise ScanError(f"at most {MAX_TARGETS} targets per scan")
     return out
 
 
 def _child_env():
-    """Окружение скана без служебных переменных BBoT процесса сервера: сервер сам импортирует BBoT
-    (метаданные модулей), и с унаследованными `_BBOT_LOGGING_SETUP` / `_BBOT_MAIN_PID` скан считает себя
-    подпроцессом и не пишет INFO-лог (по нему строится отчёт: загруженные модули, ошибки старта)."""
+    """Scan environment without the server's BBoT service variables: the server imports BBoT itself
+    (module metadata), and with inherited `_BBOT_LOGGING_SETUP` / `_BBOT_MAIN_PID` the scan thinks it is a
+    subprocess and writes no INFO log (the report relies on it: loaded modules, setup errors)."""
     env = {k: v for k, v in os.environ.items() if not k.startswith("_BBOT")}
     env["NO_COLOR"] = "1"
     return env
 
 
 def _restore_sigint():
-    # если сервер запущен в фоне (`bin/web &`), SIGINT унаследован игнорируемым — остановка не сработала бы
+    # if the server runs in the background (`bin/web &`), SIGINT is inherited as ignored and stopping would fail
     signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 
@@ -385,27 +385,27 @@ def running_job():
 
 
 def start_scan(payload, known_sources):
-    """payload: {targets, name?, modules?: [...]} — пустой modules = весь пассивный набор."""
+    """payload: {targets, name?, modules?: [...]} - empty modules = the whole passive set."""
     targets = parse_targets(payload.get("targets"))
     name = str(payload.get("name") or "").strip().lower() or default_name(targets)
     if not NAME_RE.match(name):
-        raise ScanError("имя скана: латиница в нижнем регистре, цифры, _ и -, до 60 символов")
+        raise ScanError("scan name: lowercase latin letters, digits, _ and -, up to 60 characters")
     modules = payload.get("modules") or []
     if not isinstance(modules, list) or any(m not in known_sources for m in modules):
-        raise ScanError("неизвестный источник в списке модулей")
+        raise ScanError("unknown source in the module list")
 
     busy = running_job()
     if busy:
-        raise ScanError(f"уже идёт скан {busy}: дождитесь окончания или остановите его", 409)
+        raise ScanError(f"scan {busy} is already running: wait for it or stop it", 409)
     if (SCANS_DIR / name).exists() or name in _jobs:
-        raise ScanError(f"скан {name} уже есть — выберите другое имя", 409)
+        raise ScanError(f"scan {name} already exists, choose another name", 409)
 
     cmd = [str(OSINT), "-t", *targets, "-n", name, "-y", "--no-deps", "-c", "scope.report_distance=1"]
     cmd += ["-m", *modules] if modules else ["-f", "passive"]
     SCANS_DIR.mkdir(exist_ok=True)
     log_path = SCANS_DIR / f"{name}.console.log"
     with open(log_path, "w", encoding="utf-8") as log:
-        # preexec_fn только сбрасывает обработчик сигнала — без блокировок, безопасно и при потоках сервера
+        # preexec_fn only resets a signal handler - no locks, safe with the server's threads
         proc = subprocess.Popen(
             cmd, cwd=str(ROOT), stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
             start_new_session=True, env=_child_env(), preexec_fn=_restore_sigint,  # noqa: PLW1509
@@ -452,8 +452,8 @@ def list_jobs():
 def stop_scan(name):
     j = _jobs.get(name)
     if j is None or j["proc"].poll() is not None:
-        raise ScanError("скан не выполняется", 404)
-    # BBoT по Ctrl+C корректно завершает скан и дописывает вывод
+        raise ScanError("scan is not running", 404)
+    # on Ctrl+C BBoT finishes the scan cleanly and writes its output
     os.killpg(j["proc"].pid, signal.SIGINT)
     j["stopping"] = True
     threading.Thread(target=_ensure_stopped, args=(j["proc"],), daemon=True).start()
@@ -461,7 +461,7 @@ def stop_scan(name):
 
 
 def _ensure_stopped(proc, grace=60):
-    """Если BBoT не завершился за grace секунд после SIGINT (висит на ретраях API) — SIGTERM группе."""
+    """If BBoT has not exited `grace` seconds after SIGINT (stuck in API retries), SIGTERM the group."""
     try:
         proc.wait(grace)
     except subprocess.TimeoutExpired:

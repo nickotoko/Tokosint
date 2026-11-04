@@ -1,35 +1,35 @@
-"""Статус находок скана (valid / historical / false) по всем путям обнаружения.
+"""Scan finding status (valid / historical / false) across all discovery paths.
 
-В скане модуль `validity` размечает каждое НАБЛЮДЕНИЕ (событие от конкретного модуля):
-  validity-<status>  — статус по пути, которым пришло это наблюдение;
-  freshness-<level>  — собственная актуальность наблюдения относительно родителя в выводе
+During a scan the `validity` module tags every OBSERVATION (an event from a specific module):
+  validity-<status>  - status along the path this observation came through;
+  freshness-<level>  - the observation's own freshness relative to its parent in the output
                        (current / historical / inherit / verified).
 
-Одна сущность может прийти несколькими путями: сначала из архива (historical), потом из
-актуального источника. Модули BBoT берут первую копию, поэтому в скане потомки могли
-остаться историческими. Здесь статус пересчитывается по графу всех наблюдений:
+One finding may arrive through several paths: first from an archive (historical), later from a
+current source. BBoT modules take the first copy, so its descendants may have stayed historical
+inside the scan. Here the status is recomputed over the graph of all observations:
 
-  status(сущность) = max по наблюдениям o: min(own(o), status(родитель o))
+  status(finding) = max over observations o: min(own(o), status(parent of o))
 
-own: current → valid, historical → historical, inherit → не ограничивает (берёт родителя),
-verified → valid независимо от родителя (подтверждено проверкой сейчас, например имя цели резолвится).
-Корень скана — valid. Значения только растут, поэтому итерация до неподвижной точки конечна.
-Ложные находки в вывод не попадают (validity_false.jsonl скана).
+own: current -> valid, historical -> historical, inherit -> no cap (takes the parent's),
+verified -> valid regardless of the parent (confirmed now, e.g. a target name resolves).
+The scan root is valid. Values only grow, so iterating to a fixed point terminates.
+False findings are not in the output (see the scan's validity_false.jsonl).
 """
 
 FALSE, HISTORICAL, VALID, VERIFIED = 0, 1, 2, 3
 NAMES = {FALSE: "false", HISTORICAL: "historical", VALID: "valid"}
-# freshness-false: ложное наблюдение (скрытый кандидат-домен, который ядро вернуло в вывод как звено графа)
+# freshness-false: a false observation (a hidden candidate domain re-emitted by the core as a graph link)
 OWN = {"freshness-current": VALID, "freshness-historical": HISTORICAL, "freshness-inherit": VALID,
        "freshness-verified": VERIFIED, "freshness-false": FALSE}
 TAGGED = {"validity-valid": VALID, "validity-historical": HISTORICAL, "validity-false": FALSE}
 
 
 def compute_status(events):
-    """events — словари JSONL скана. Возвращает {id события: "valid"|"historical"|"false"};
-    события без разметки (сканы до появления validity) в ответ не попадают."""
+    """events - JSONL scan dicts. Returns {event id: "valid"|"historical"|"false"};
+    events without tags (scans made before validity existed) are not in the result."""
     status = {}
-    edges = []  # (id, parent_id, own, статус из скана)
+    edges = []  # (id, parent_id, own, status from the scan)
     for e in events:
         eid = e.get("id")
         if not eid:
@@ -48,7 +48,7 @@ def compute_status(events):
     for eid, _parent, own, _tagged in edges:
         if own == VERIFIED:
             status[eid] = VALID
-    # наблюдение, чей родитель не попал в вывод, берёт статус, посчитанный в скане
+    # an observation whose parent is missing from the output keeps the status computed in the scan
     for eid, parent, _own, tagged in edges:
         if parent not in ids and tagged is not None:
             status[eid] = max(status.get(eid, FALSE), tagged)
