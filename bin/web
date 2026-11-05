@@ -5,4 +5,5 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT/bin/_env.sh"
 require_install
+check_secrets
 exec "$ROOT/bbot/.venv/bin/python" "$ROOT/web/server.py" "${1:-8777}"

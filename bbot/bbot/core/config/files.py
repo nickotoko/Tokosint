@@ -62,6 +62,12 @@ class BBOTConfigFiles:
                     f"Error parsing config at {filename}: expected a YAML mapping at the top level, "
                     f"got {type(conf).__name__}"
                 )
+            # an empty "modules:" section (or an empty module block under it, e.g. in a secrets template whose
+            # entries are all commented out) parses as null and would wipe every module's config: treat it as unset
+            if "modules" in conf and conf["modules"] is None:
+                conf["modules"] = {}
+            if isinstance(conf.get("modules"), dict):
+                conf["modules"] = {k: v for k, v in conf["modules"].items() if v is not None}
             cli_silent = any(x in sys.argv for x in ("-s", "--silent"))
             if __name__ == "__main__" and not cli_silent:
                 log_to_stderr(f"Loaded {name} from {filename}")

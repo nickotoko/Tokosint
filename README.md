@@ -103,6 +103,7 @@ The configuration is isolated in `config/` (the `BBOT_CONFIG_DIR` variable, set 
 | `ModuleNotFoundError: No module named 'bbot'` | the install stopped half-way (usually blasthttp failed to build) | `brew install openssl@3`, `xcode-select --install`, then `bin/setup` |
 | `Tokosint is not installed (or the install did not finish)` | same as above, reported by the `bin/` scripts | `bin/setup` |
 | `uv is not installed` | uv is missing | `brew install uv`, then `bin/setup` |
+| `[config:fofa] Could not find config option "fofa"` | a module block ended up at the top level of `config/secrets.yml` (a bug of the Keys tab, now fixed) | nothing: the `bin/` scripts move it back under `modules:` on start |
 | `invalid peer certificate: UnknownIssuer` | the network intercepts HTTPS (corporate proxy, antivirus with TLS inspection) | nothing: `bin/setup` retries with the macOS keychain certificates and saves them to `config/ca-bundle.pem`, which the `bin/` scripts then use for scans; force it with `bin/setup --system-certs` |
 
 If `bin/setup` still fails, start from scratch: `rm -rf bbot/.venv && bin/setup`, and check the first error it prints.

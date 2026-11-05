@@ -23,12 +23,31 @@ class SecretError(Exception):
         self.code = code
 
 
-def _load():
+def _load(known_modules=()):
+    """(header comments, data). The header always ends with a newline: BBoT's own commented secrets template has none
+    at the end, and without it the "modules:" line written after the header became part of the last comment, pushing
+    the first saved module to the top level. Module blocks found at the top level are moved back under "modules:"."""
     if not SECRETS.exists():
         return "", {}
     text = SECRETS.read_text()
     header = "".join(line for line in text.splitlines(keepends=True) if line.startswith("#"))
-    return header, yaml.safe_load(text) or {}
+    if header and not header.endswith("\n"):
+        header += "\n"
+    data = yaml.safe_load(text) or {}
+    if not isinstance(data, dict):
+        raise SecretError("config/secrets.yml is not a YAML mapping: fix or delete it", 500)
+    return header, repair(data, known_modules)
+
+
+def repair(data, known_modules):
+    """Moves module blocks written at the top level back under "modules:" (returns the data)."""
+    misplaced = [k for k in list(data) if k != "modules" and k in known_modules and isinstance(data[k], dict)]
+    if misplaced:
+        modules = data.get("modules") or {}
+        for k in misplaced:
+            modules.setdefault(k, {}).update(data.pop(k))
+        data["modules"] = modules
+    return data
 
 
 def _save(header, data):
@@ -64,7 +83,7 @@ def sensitive_fields(preloaded):
 
 
 def list_secrets(preloaded):
-    _, data = _load()
+    _, data = _load(preloaded)
     modules = (data.get("modules") or {}) if isinstance(data, dict) else {}
     rows = []
     for module, fields in sensitive_fields(preloaded).items():
@@ -100,15 +119,17 @@ def set_secret(preloaded, module, field, value):
     if len(value) > MAX_LEN or any(c in value for c in "\r\n\0"):
         raise SecretError("invalid key value")
     with _lock:
-        header, data = _load()
-        data.setdefault("modules", {}).setdefault(module, {})[field] = value
+        header, data = _load(preloaded)
+        modules = data.get("modules") or {}
+        data["modules"] = modules
+        modules.setdefault(module, {})[field] = value
         _save(header, data)
 
 
 def delete_secret(preloaded, module, field):
     _check(preloaded, module, field)
     with _lock:
-        header, data = _load()
+        header, data = _load(preloaded)
         modules = data.get("modules") or {}
         current = modules.get(module) or {}
         if field not in current:

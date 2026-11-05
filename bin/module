@@ -37,6 +37,9 @@ def load(path):
         return "", {}
     text = open(path).read()
     header = "".join(l for l in text.splitlines(keepends=True) if l.startswith("#"))
+    # the header must end with a newline, or the "modules:" line written after it becomes part of the last comment
+    if header and not header.endswith("\n"):
+        header += "\n"
     return header, yaml.safe_load(text) or {}
 
 
@@ -52,14 +55,16 @@ if op == "move":
     dst_header, d = load(dst)
     block = (s.get("modules") or {}).pop(name, None)
     if block is not None:
-        d.setdefault("modules", {})[name] = block
+        d["modules"] = d.get("modules") or {}
+        d["modules"][name] = block
         save(src, src_header, s)
         save(dst, dst_header, d)
         print(f"  key {name}: {os.path.basename(src)} -> {os.path.basename(dst)}")
 elif op == "set":
     path, name, key = os.path.join(config_dir, args[0]), args[1], args[2]
     header, d = load(path)
-    d.setdefault("modules", {}).setdefault(name, {})["api_key"] = key
+    d["modules"] = d.get("modules") or {}
+    d["modules"].setdefault(name, {})["api_key"] = key
     save(path, header, d)
     print(f"  key {name} written to {os.path.basename(path)}")
 EOF
