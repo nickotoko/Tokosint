@@ -146,6 +146,26 @@ if [ ${#MODULE_PIP[@]} -gt 0 ]; then
     || fail "installing module dependencies failed (see above)."
 fi
 
+# blasthttp must actually make an HTTPS request: a wheel built against an OpenSSL version that Homebrew has since
+# removed (cached by uv) panics on every request; then rebuild it from source without the cache
+https_ok() {
+  "$ROOT/bbot/.venv/bin/python" -c "
+import asyncio, blasthttp
+async def main():
+    r = await blasthttp.BlastHTTP().request('https://pypi.org/simple/', timeout=20)
+    assert r.status < 500, r.status
+asyncio.run(main())" >/dev/null 2>&1
+}
+if ! https_ok; then
+  echo "! blasthttp cannot make HTTPS requests (often: built against an OpenSSL that Homebrew upgraded): rebuilding it…"
+  UV_NO_CACHE=1 "$UV" sync --python 3.12 --reinstall-package blasthttp ${GROUP[@]+"${GROUP[@]}"} \
+    || fail "rebuilding blasthttp failed (see above)."
+  [ ${#MODULE_PIP[@]} -gt 0 ] && "$UV" pip install --python "$ROOT/bbot/.venv/bin/python" "${MODULE_PIP[@]}" >/dev/null
+  https_ok || fail "blasthttp still cannot make HTTPS requests. Check: brew reinstall openssl@3, network access to pypi.org,
+    and (behind a TLS-intercepting proxy) bin/setup --system-certs. Details:
+    $ROOT/bbot/.venv/bin/python -c 'import asyncio, blasthttp; print(asyncio.run(blasthttp.BlastHTTP().request(\"https://pypi.org/simple/\")).status)'"
+fi
+
 mkdir -p "$ROOT/scans" "$ROOT/data"
 
 # summary of what modules need at run time
@@ -163,6 +183,7 @@ for req in sys.argv[1:]:
 }
 check "module Python packages (${#MODULE_PIP[@]}: ${MODULE_PIP[*]-none})" "pip_ok" "re-run bin/setup"
 check "trufflehog" "command -v trufflehog" "brew install trufflehog (trufflehog module)"
+check "HTTPS through blasthttp" "https_ok" "see the error above"
 check "git" "command -v git" "xcode-select --install (git_clone module)"
 check "7z" "command -v 7z" "brew install p7zip (unarchive)"
 check "GNU tar" "command -v gtar || [ \"\$(uname -s)\" != Darwin ]" "brew install gnu-tar"

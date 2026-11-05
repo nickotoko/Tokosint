@@ -10,6 +10,16 @@ if [ -s "$CA_BUNDLE" ]; then
   export SSL_CERT_FILE="$CA_BUNDLE" REQUESTS_CA_BUNDLE="$CA_BUNDLE" CURL_CA_BUNDLE="$CA_BUNDLE"
 fi
 
+# blasthttp (BBoT's HTTP engine) links OpenSSL statically and has the absolute path of OpenSSL's provider modules
+# (ossl-modules, with legacy.dylib) baked in at build time, e.g. /opt/homebrew/Cellar/openssl@3/3.6.2/... A Homebrew
+# upgrade removes that versioned directory and every HTTP request then panics with "failed to load OpenSSL legacy
+# provider". The opt/ symlink always points to the installed version, so point OpenSSL there.
+if [ -z "${OPENSSL_MODULES:-}" ]; then
+  for dir in /opt/homebrew/opt/openssl@3/lib/ossl-modules /usr/local/opt/openssl@3/lib/ossl-modules; do
+    if [ -f "$dir/legacy.dylib" ]; then export OPENSSL_MODULES="$dir"; break; fi
+  done
+fi
+
 require_install() {
   # bbot/.venv/bin/bbot exists only after a complete install (a failed install leaves a bare .venv)
   [ -x "$ROOT/bbot/.venv/bin/bbot" ] || {

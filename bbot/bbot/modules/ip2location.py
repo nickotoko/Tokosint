@@ -56,12 +56,13 @@ class IP2Location(BaseModule):
         try:
             url = self.build_url(event.data)
             result = await self.api_request(url)
-            if result:
-                geo_data = result.json()
-                if not geo_data:
-                    self.verbose(f"No JSON response from {url}")
-            else:
+            if not result:
                 self.verbose(f"No response from {url}")
+                return
+            geo_data = result.json()
+            if not isinstance(geo_data, dict) or not geo_data:
+                self.verbose(f"No JSON response from {url}")
+                return
         except Exception:
             self.verbose(f"Error retrieving results for {event.pretty_string}", trace=True)
             return

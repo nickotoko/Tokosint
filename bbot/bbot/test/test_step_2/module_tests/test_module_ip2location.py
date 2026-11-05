@@ -42,3 +42,33 @@ class TestIP2Location_Keyless(TestIP2Location):
         super().check(module_test, events)
         geo = [e for e in events if e.type == "GEOLOCATION"]
         assert all("message" not in e.data for e in geo), "service notice must not end up in the event"
+
+
+class TestIP2Location_NoResponse(TestIP2Location):
+    """The API did not answer (network error, quota): no GEOLOCATION and no crash
+    (previously: UnboundLocalError 'geo_data' in handle_event)."""
+
+    module_name = "ip2location"
+
+    async def setup_after_prep(self, module_test):
+        module = module_test.module
+        self.errors = []
+
+        async def no_response(*args, **kwargs):
+            return None
+
+        module.api_request = no_response
+        original = module.handle_event
+
+        async def guarded(event):
+            try:
+                return await original(event)
+            except Exception as e:  # noqa: BLE001 - recorded for the assertion
+                self.errors.append(e)
+                raise
+
+        module.handle_event = guarded
+
+    def check(self, module_test, events):
+        assert not self.errors, self.errors
+        assert not any(e.type == "GEOLOCATION" for e in events)
