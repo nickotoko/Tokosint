@@ -43,9 +43,23 @@ if [ "$IS_MAC" = 1 ]; then
   for candidate in /opt/homebrew/opt/openssl@3 /usr/local/opt/openssl@3; do
     { [ -z "$OPENSSL" ] || [ ! -d "$OPENSSL" ]; } && [ -d "$candidate" ] && OPENSSL="$candidate"
   done
-  [ -n "$OPENSSL" ] && [ -d "$OPENSSL" ] || fail "OpenSSL 3 from Homebrew is required: run  brew install openssl@3  and then bin/setup again."
+  # Homebrew packages that BBoT and its modules expect (BBoT would otherwise try to install them itself with sudo):
+  #   openssl@3 - headers for building blasthttp; gnu-tar - unpacking module binaries; p7zip - 7z for archives;
+  #   trufflehog - the secret scanner used by the trufflehog module
+  if command -v brew >/dev/null 2>&1; then
+    missing=()
+    [ -n "$OPENSSL" ] && [ -d "$OPENSSL" ] || missing+=(openssl@3)
+    command -v gtar >/dev/null 2>&1 || missing+=(gnu-tar)
+    command -v 7z >/dev/null 2>&1 || missing+=(p7zip)
+    command -v trufflehog >/dev/null 2>&1 || missing+=(trufflehog)
+    if [ ${#missing[@]} -gt 0 ]; then
+      echo "Installing with Homebrew: ${missing[*]}"
+      brew install "${missing[@]}" || fail "brew install ${missing[*]} failed (see above)."
+      OPENSSL="$(brew --prefix openssl@3 2>/dev/null || true)"
+    fi
+  fi
+  [ -n "$OPENSSL" ] && [ -d "$OPENSSL" ] || fail "OpenSSL 3 from Homebrew is required: install Homebrew (https://brew.sh), run  brew install openssl@3  and then bin/setup again."
   export OPENSSL_DIR="$OPENSSL" PKG_CONFIG_PATH="$OPENSSL/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
-  command -v gtar >/dev/null 2>&1 || echo "! GNU tar is recommended for some modules' binary dependencies: brew install gnu-tar"
 fi
 
 build_ca_bundle() {
@@ -104,7 +118,40 @@ fi
   || fail "the environment exists but bbot/blasthttp cannot be imported. Remove it and reinstall:
     rm -rf \"$ROOT/bbot/.venv\" && \"$ROOT/bin/setup\""
 
+# pip dependencies declared by the active modules (deps_pip, e.g. asyncpg for crt_db). They are not in uv.lock, and scans
+# run with --no-deps, so they must be installed here; uv sync removes them, so this runs on every bin/setup.
+MODULE_PIP=()
+while IFS= read -r dep; do [ -n "$dep" ] && MODULE_PIP+=("$dep"); done < <(
+  "$ROOT/bbot/.venv/bin/python" -c "
+from bbot.core.modules import MODULE_LOADER
+deps = sorted({d for p in MODULE_LOADER.preloaded().values() for d in ((p.get('deps') or {}).get('pip') or [])})
+print('\n'.join(deps))")
+if [ ${#MODULE_PIP[@]} -gt 0 ]; then
+  echo "Installing module dependencies: ${MODULE_PIP[*]}"
+  "$UV" pip install --python "$ROOT/bbot/.venv/bin/python" "${MODULE_PIP[@]}" \
+    || fail "installing module dependencies failed (see above)."
+fi
+
 mkdir -p "$ROOT/scans" "$ROOT/data"
+
+# summary of what modules need at run time
+echo
+check() { if eval "$2" >/dev/null 2>&1; then printf '  ✓ %s\n' "$1"; else printf '  ✗ %s — %s\n' "$1" "$3"; fi; }
+pip_ok() {
+  "$ROOT/bbot/.venv/bin/python" -c "
+import sys
+from importlib.metadata import distribution
+from packaging.requirements import Requirement
+for req in sys.argv[1:]:
+    r = Requirement(req)
+    if distribution(r.name).version not in r.specifier:
+        sys.exit(1)" ${MODULE_PIP[@]+"${MODULE_PIP[@]}"}
+}
+check "module Python packages (${#MODULE_PIP[@]}: ${MODULE_PIP[*]-none})" "pip_ok" "re-run bin/setup"
+check "trufflehog" "command -v trufflehog" "brew install trufflehog (trufflehog module)"
+check "git" "command -v git" "xcode-select --install (git_clone module)"
+check "7z" "command -v 7z" "brew install p7zip (unarchive)"
+check "GNU tar" "command -v gtar || [ \"\$(uname -s)\" != Darwin ]" "brew install gnu-tar"
 echo
 echo "✓ Tokosint is installed."
 [ "$SYSTEM_CERTS" = 1 ] && echo "  HTTPS is intercepted on this network: scans will trust config/ca-bundle.pem (rebuild: bin/setup --system-certs)."

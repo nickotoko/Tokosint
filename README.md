@@ -80,7 +80,8 @@ finds another scan in progress waits for it. Only finished scans are added to a 
 Requirements: [uv](https://docs.astral.sh/uv/) (`brew install uv` or `curl -LsSf https://astral.sh/uv/install.sh | sh`);
 uv downloads Python 3.12 itself. On macOS also the Xcode Command Line Tools (`xcode-select --install`) and Homebrew
 OpenSSL (`brew install openssl@3`): `blasthttp` has no macOS wheels and is built from source; GNU tar
-(`brew install gnu-tar`) is recommended for some modules' binary dependencies.
+(`brew install gnu-tar`) is recommended for some modules' binary dependencies. With Homebrew present, `bin/setup`
+installs the missing `openssl@3`, `gnu-tar`, `p7zip` and `trufflehog` itself, plus the modules' own Python dependencies.
 
 ```bash
 git clone https://github.com/nickotoko/Tokosint.git && cd Tokosint
@@ -103,6 +104,7 @@ The configuration is isolated in `config/` (the `BBOT_CONFIG_DIR` variable, set 
 | `ModuleNotFoundError: No module named 'bbot'` | the install stopped half-way (usually blasthttp failed to build) | `brew install openssl@3`, `xcode-select --install`, then `bin/setup` |
 | `Tokosint is not installed (or the install did not finish)` | same as above, reported by the `bin/` scripts | `bin/setup` |
 | `uv is not installed` | uv is missing | `brew install uv`, then `bin/setup` |
+| `Error loading module crt_db: No module named 'asyncpg'` / `Installing core BBOT dependencies: 7z,…` | module dependencies are not in `uv.lock` and scans run with `--no-deps` | `git pull && bin/setup`: it installs the active modules' pip dependencies and, on macOS, `openssl@3`, `gnu-tar`, `p7zip`, `trufflehog` with Homebrew, then prints a checklist |
 | `[config:fofa] Could not find config option "fofa"` | a module block ended up at the top level of `config/secrets.yml` (a bug of the Keys tab, now fixed) | nothing: the `bin/` scripts move it back under `modules:` on start |
 | `invalid peer certificate: UnknownIssuer` | the network intercepts HTTPS (corporate proxy, antivirus with TLS inspection) | nothing: `bin/setup` retries with the macOS keychain certificates and saves them to `config/ca-bundle.pem`, which the `bin/` scripts then use for scans; force it with `bin/setup --system-certs` |
 
