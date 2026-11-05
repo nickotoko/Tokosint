@@ -7,6 +7,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO="$ROOT/bbot"
+. "$ROOT/bin/_env.sh"
 ACTIVE="bbot/modules"
 ARCHIVE="modules_archive/modules"
 TESTS_ACTIVE="bbot/test/test_step_2/module_tests"
@@ -23,7 +24,7 @@ find_module() { # $1 = base dir, $2 = name
 }
 
 secrets() { # move <from> <to> <name> | set <file> <name> <key>
-  [ -x "$REPO/.venv/bin/bbot" ] || { echo "Tokosint is not installed (or the install did not finish): run  $ROOT/bin/setup" >&2; exit 1; }
+  require_install
   "$REPO/.venv/bin/python" -I - "$ROOT/config" "$@" <<'EOF'
 import os, sys, yaml
 

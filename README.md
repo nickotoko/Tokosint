@@ -84,7 +84,7 @@ OpenSSL (`brew install openssl@3`): `blasthttp` has no macOS wheels and is built
 
 ```bash
 git clone https://github.com/nickotoko/Tokosint.git && cd Tokosint
-bin/setup          # creates bbot/.venv; bin/setup --dev also installs the test dependencies
+bin/setup          # creates bbot/.venv; --dev adds the test dependencies, --system-certs trusts the macOS keychain
 ```
 
 `bin/setup` checks the requirements and tells what is missing; it is safe to re-run (e.g. after `git pull`).
@@ -103,6 +103,7 @@ The configuration is isolated in `config/` (the `BBOT_CONFIG_DIR` variable, set 
 | `ModuleNotFoundError: No module named 'bbot'` | the install stopped half-way (usually blasthttp failed to build) | `brew install openssl@3`, `xcode-select --install`, then `bin/setup` |
 | `Tokosint is not installed (or the install did not finish)` | same as above, reported by the `bin/` scripts | `bin/setup` |
 | `uv is not installed` | uv is missing | `brew install uv`, then `bin/setup` |
+| `invalid peer certificate: UnknownIssuer` | the network intercepts HTTPS (corporate proxy, antivirus with TLS inspection) | nothing: `bin/setup` retries with the macOS keychain certificates and saves them to `config/ca-bundle.pem`, which the `bin/` scripts then use for scans; force it with `bin/setup --system-certs` |
 
 If `bin/setup` still fails, start from scratch: `rm -rf bbot/.venv && bin/setup`, and check the first error it prints.
 

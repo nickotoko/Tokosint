@@ -1,12 +1,28 @@
 #!/usr/bin/env bash
 # Install Tokosint: create bbot/.venv with all dependencies (uv + Python 3.12).
-#   bin/setup          runtime dependencies
-#   bin/setup --dev    plus test dependencies (pytest etc.)
+#   bin/setup                  runtime dependencies
+#   bin/setup --dev            plus test dependencies (pytest etc.)
+#   bin/setup --system-certs   trust the macOS keychain certificates from the start (networks that intercept TLS)
 # Safe to re-run: it only brings the environment in line with bbot/uv.lock.
+#
+# On networks that intercept HTTPS (a corporate proxy or an antivirus with TLS inspection) downloads fail with
+# "invalid peer certificate: UnknownIssuer". bin/setup then builds config/ca-bundle.pem from the macOS keychains
+# (the intercepting CA is installed there) and retries; the bin/ scripts use that bundle for scans as well.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CA_BUNDLE="$ROOT/config/ca-bundle.pem"
 
 fail() { printf '\n✗ %s\n' "$*" >&2; exit 1; }
+
+DEV=0
+SYSTEM_CERTS=0
+for arg in "$@"; do
+  case "$arg" in
+    --dev) DEV=1 ;;
+    --system-certs) SYSTEM_CERTS=1 ;;
+    *) fail "unknown option: $arg (use --dev and/or --system-certs)" ;;
+  esac
+done
 
 UV="$(command -v uv || true)"
 for candidate in "$HOME/.local/bin/uv" "$HOME/.cargo/bin/uv" /opt/homebrew/bin/uv /usr/local/bin/uv; do
@@ -17,7 +33,9 @@ done
     curl -LsSf https://astral.sh/uv/install.sh | sh
   then run bin/setup again."
 
-if [ "$(uname -s)" = "Darwin" ]; then
+IS_MAC=0
+[ "$(uname -s)" = "Darwin" ] && IS_MAC=1
+if [ "$IS_MAC" = 1 ]; then
   # blasthttp has no macOS wheels and is built from source: it needs a C toolchain and OpenSSL
   xcode-select -p >/dev/null 2>&1 || fail "Xcode Command Line Tools are required: run  xcode-select --install  and then bin/setup again."
   OPENSSL=""
@@ -30,16 +48,55 @@ if [ "$(uname -s)" = "Darwin" ]; then
   command -v gtar >/dev/null 2>&1 || echo "! GNU tar is recommended for some modules' binary dependencies: brew install gnu-tar"
 fi
 
+build_ca_bundle() {
+  [ "$IS_MAC" = 1 ] || fail "TLS interception detected: on Linux add the intercepting CA to the system store and set
+    SSL_CERT_FILE to the system bundle, then run bin/setup again."
+  local keychains=(/System/Library/Keychains/SystemRootCertificates.keychain /Library/Keychains/System.keychain)
+  [ -f "$HOME/Library/Keychains/login.keychain-db" ] && keychains+=("$HOME/Library/Keychains/login.keychain-db")
+  security find-certificate -a -p "${keychains[@]}" > "$CA_BUNDLE.tmp" 2>/dev/null || true
+  [ -s "$CA_BUNDLE.tmp" ] || { rm -f "$CA_BUNDLE.tmp"; fail "could not export certificates from the macOS keychains."; }
+  mv "$CA_BUNDLE.tmp" "$CA_BUNDLE"
+  echo "  certificate bundle from the macOS keychains: config/ca-bundle.pem ($(grep -c 'BEGIN CERTIFICATE' "$CA_BUNDLE") certificates)"
+}
+
+use_system_certs() {
+  build_ca_bundle
+  export SSL_CERT_FILE="$CA_BUNDLE" REQUESTS_CA_BUNDLE="$CA_BUNDLE" CURL_CA_BUNDLE="$CA_BUNDLE"
+  # uv >= 0.13: --system-certs / UV_SYSTEM_CERTS; older uv: --native-tls / UV_NATIVE_TLS
+  if "$UV" sync --help 2>/dev/null | grep -q -- "--system-certs"; then export UV_SYSTEM_CERTS=true; else export UV_NATIVE_TLS=true; fi
+}
+
+[ "$SYSTEM_CERTS" = 1 ] && use_system_certs
+
 GROUP=()
-[ "${1:-}" = "--dev" ] && GROUP=(--group dev)
+[ "$DEV" = 1 ] && GROUP=(--group dev)
+LOG="$(mktemp -t tokosint-setup)"
+trap 'rm -f "$LOG"' EXIT
+
+sync_deps() {
+  set +e
+  "$UV" sync --python 3.12 ${GROUP[@]+"${GROUP[@]}"} 2>&1 | tee "$LOG"
+  local rc=${PIPESTATUS[0]}
+  set -e
+  return "$rc"
+}
 
 echo "Installing dependencies into bbot/.venv (first run builds blasthttp from source and takes a few minutes)…"
 cd "$ROOT/bbot"
-if ! "$UV" sync --python 3.12 ${GROUP[@]+"${GROUP[@]}"}; then
-  fail "the install did not finish (see the error above). Usual causes on macOS:
+if ! sync_deps; then
+  if [ "$SYSTEM_CERTS" = 0 ] && grep -qiE "UnknownIssuer|invalid peer certificate|certificate verify failed|self[- ]signed certificate" "$LOG"; then
+    echo
+    echo "! The network intercepts HTTPS (corporate proxy or antivirus): retrying with the macOS keychain certificates…"
+    use_system_certs
+    SYSTEM_CERTS=1
+    sync_deps || fail "the install did not finish even with the system certificates (see the error above).
+  Check that the intercepting CA is trusted in Keychain Access, or install on another network."
+  else
+    fail "the install did not finish (see the error above). Usual causes on macOS:
     - blasthttp failed to build: check  brew install openssl@3  and  xcode-select --install
     - no network access to pypi.org / github.com
   Fix the cause and run bin/setup again: it continues from where it stopped."
+  fi
 fi
 
 # make sure the environment is complete, not just created
@@ -50,6 +107,7 @@ fi
 mkdir -p "$ROOT/scans" "$ROOT/data"
 echo
 echo "✓ Tokosint is installed."
+[ "$SYSTEM_CERTS" = 1 ] && echo "  HTTPS is intercepted on this network: scans will trust config/ca-bundle.pem (rebuild: bin/setup --system-certs)."
 echo "  Web interface:  bin/web        (then open http://127.0.0.1:8777/)"
 echo "  Command line:   bin/osint -t target.example -f passive -y --no-deps -n <name>"
 echo "  API keys:       Keys tab in the web interface, or config/secrets.yml (template: config/secrets.example.yml)"

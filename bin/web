@@ -3,7 +3,6 @@
 #   bin/web [port]   start the local backend (default 8777), listens on 127.0.0.1 only
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# bbot/.venv/bin/bbot exists only after a complete install (a failed install leaves a bare .venv)
-[ -x "$ROOT/bbot/.venv/bin/bbot" ] || { echo "Tokosint is not installed (or the install did not finish): run  $ROOT/bin/setup" >&2; exit 1; }
-export BBOT_CONFIG_DIR="$ROOT/config"
+. "$ROOT/bin/_env.sh"
+require_install
 exec "$ROOT/bbot/.venv/bin/python" "$ROOT/web/server.py" "${1:-8777}"

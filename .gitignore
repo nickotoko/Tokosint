@@ -23,3 +23,6 @@ web/health.json
 
 # Tokosint state: companies, timeline, Telegram bot token
 data/
+
+# CA bundle exported from the macOS keychains on networks that intercept TLS (bin/setup)
+config/ca-bundle.pem
