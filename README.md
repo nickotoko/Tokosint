@@ -95,6 +95,17 @@ API keys are optional: set them on the Keys tab of the web interface, or copy `c
 The configuration is isolated in `config/` (the `BBOT_CONFIG_DIR` variable, set by the `bin/` scripts); the global
 `~/.config/bbot` is not used.
 
+### Troubleshooting
+
+| Error | Cause | Fix |
+|---|---|---|
+| `bbot/.venv/bin/bbot: No such file or directory` | dependencies were never installed | `bin/setup` |
+| `ModuleNotFoundError: No module named 'bbot'` | the install stopped half-way (usually blasthttp failed to build) | `brew install openssl@3`, `xcode-select --install`, then `bin/setup` |
+| `Tokosint is not installed (or the install did not finish)` | same as above, reported by the `bin/` scripts | `bin/setup` |
+| `uv is not installed` | uv is missing | `brew install uv`, then `bin/setup` |
+
+If `bin/setup` still fails, start from scratch: `rm -rf bbot/.venv && bin/setup`, and check the first error it prints.
+
 ## Usage
 
 ```bash

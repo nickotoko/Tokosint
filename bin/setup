@@ -35,7 +35,17 @@ GROUP=()
 
 echo "Installing dependencies into bbot/.venv (first run builds blasthttp from source and takes a few minutes)…"
 cd "$ROOT/bbot"
-"$UV" sync --python 3.12 ${GROUP[@]+"${GROUP[@]}"}
+if ! "$UV" sync --python 3.12 ${GROUP[@]+"${GROUP[@]}"}; then
+  fail "the install did not finish (see the error above). Usual causes on macOS:
+    - blasthttp failed to build: check  brew install openssl@3  and  xcode-select --install
+    - no network access to pypi.org / github.com
+  Fix the cause and run bin/setup again: it continues from where it stopped."
+fi
+
+# make sure the environment is complete, not just created
+"$ROOT/bbot/.venv/bin/python" -c "import bbot, blasthttp" 2>/dev/null \
+  || fail "the environment exists but bbot/blasthttp cannot be imported. Remove it and reinstall:
+    rm -rf \"$ROOT/bbot/.venv\" && \"$ROOT/bin/setup\""
 
 mkdir -p "$ROOT/scans" "$ROOT/data"
 echo

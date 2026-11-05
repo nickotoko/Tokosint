@@ -3,6 +3,7 @@
 # The bin/web server does the same once a day automatically.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-[ -x "$ROOT/bbot/.venv/bin/python" ] || { echo "Tokosint is not installed on this machine yet: run  $ROOT/bin/setup" >&2; exit 1; }
+# bbot/.venv/bin/bbot exists only after a complete install (a failed install leaves a bare .venv)
+[ -x "$ROOT/bbot/.venv/bin/bbot" ] || { echo "Tokosint is not installed (or the install did not finish): run  $ROOT/bin/setup" >&2; exit 1; }
 export BBOT_CONFIG_DIR="$ROOT/config"
 exec "$ROOT/bbot/.venv/bin/python" "$ROOT/web/health.py"
