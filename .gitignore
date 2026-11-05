@@ -26,3 +26,6 @@ data/
 
 # CA bundle exported from the macOS keychains on networks that intercept TLS (bin/setup)
 config/ca-bundle.pem
+
+# project-local uv cache (bin/setup falls back to it when ~/.cache/uv is not writable)
+.cache/
