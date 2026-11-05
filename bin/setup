@@ -17,11 +17,9 @@ fail() { printf '\n✗ %s\n' "$*" >&2; exit 1; }
 # running as root leaves root-owned caches in the user's home (~/.cache/uv, ~/.bbot) that later break every run
 [ "$(id -u)" = 0 ] && fail "do not run bin/setup with sudo: run it as your user (it asks for nothing that needs root)."
 
-# directories in $HOME that BBoT/uv write to and that an earlier sudo run may have left owned by root
+. "$ROOT/bin/_env.sh"   # foreign_home_dirs / check_home_ownership
 USER_NAME="$(id -un)"
 foreign_owned() { [ -e "$1" ] && [ -n "$(find "$1" ! -user "$USER_NAME" -print -quit 2>/dev/null)" ]; }
-FIX_OWNERSHIP=()
-for dir in "$HOME/.bbot" "$HOME/.cache/cloudcheck"; do foreign_owned "$dir" && FIX_OWNERSHIP+=("$dir"); done
 
 DEV=0
 SYSTEM_CERTS=0
@@ -107,7 +105,6 @@ sync_deps() {
 # uv cache owned by another user (an earlier `sudo uv ...`): continue with a cache inside the project
 UV_CACHE="${UV_CACHE_DIR:-$HOME/.cache/uv}"
 if foreign_owned "$UV_CACHE" || { [ -e "$UV_CACHE" ] && [ ! -w "$UV_CACHE" ]; }; then
-  FIX_OWNERSHIP+=("$UV_CACHE")
   export UV_CACHE_DIR="$ROOT/.cache/uv"
   echo "! $UV_CACHE is not writable by $USER_NAME (usually left by an earlier sudo run): using the project cache $UV_CACHE_DIR"
 fi
@@ -169,9 +166,12 @@ check "trufflehog" "command -v trufflehog" "brew install trufflehog (trufflehog 
 check "git" "command -v git" "xcode-select --install (git_clone module)"
 check "7z" "command -v 7z" "brew install p7zip (unarchive)"
 check "GNU tar" "command -v gtar || [ \"\$(uname -s)\" != Darwin ]" "brew install gnu-tar"
-for dir in ${FIX_OWNERSHIP[@]+"${FIX_OWNERSHIP[@]}"}; do
-  printf '  ✗ %s is not yours or not writable (usually an earlier sudo run) — fix: sudo chown -R "%s" "%s"\n' "$dir" "$USER_NAME" "$dir"
-done
+if [ -n "$(foreign_home_dirs)" ]; then
+  printf '  ✗ directories in your home are not yours:\n'
+  check_home_ownership 2>&1 | tail -n +2
+else
+  printf '  ✓ ~/.cache and ~/.bbot belong to %s\n' "$USER_NAME"
+fi
 echo
 echo "✓ Tokosint is installed."
 [ "$SYSTEM_CERTS" = 1 ] && echo "  HTTPS is intercepted on this network: scans will trust config/ca-bundle.pem (rebuild: bin/setup --system-certs)."

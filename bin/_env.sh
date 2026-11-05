@@ -53,3 +53,25 @@ if misplaced:
     print(f"repaired config/secrets.yml: moved {', '.join(misplaced)} under 'modules:'", file=sys.stderr)
 PY
 }
+
+foreign_home_dirs() {
+  # directories under ~/.cache and ~/.bbot (two levels deep, ~30 ms) that are not owned by the current user, usually
+  # left by an earlier `sudo` run; BBoT, tldextract, cloudcheck and uv write there and fail or hang on them
+  local me; me="$(id -un)"
+  { find "$HOME/.cache" -maxdepth 2 ! -user "$me" -print 2>/dev/null
+    find "$HOME/.bbot" -maxdepth 2 ! -user "$me" -print 2>/dev/null; } \
+    | sed -E "s|^($HOME/\.cache/[^/]+).*|\1|; s|^($HOME/\.bbot).*|\1|" | sort -u
+}
+
+check_home_ownership() {
+  # warn (do not stop): stale root-owned leftovers are sometimes harmless, but a root-owned cache makes scans hang
+  local dirs; dirs="$(foreign_home_dirs)"
+  [ -z "$dirs" ] && return 0
+  {
+    echo "! Not owned by $(id -un) (usually left by an earlier sudo run) — scans may fail or hang:"
+    echo "$dirs" | sed "s|^|    |"
+    printf '  fix:  sudo chown -R "%s"' "$(id -un)"
+    echo "$dirs" | while IFS= read -r d; do printf ' "%s"' "$d"; done
+    echo
+  } >&2
+}

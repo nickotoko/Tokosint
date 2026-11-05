@@ -5,4 +5,5 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT/bin/_env.sh"
 require_install
 check_secrets
+check_home_ownership
 exec "$ROOT/bbot/.venv/bin/bbot" -o "$ROOT/scans" "$@"
