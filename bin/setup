@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Install Tokosint: create bbot/.venv with all dependencies (uv + Python 3.12).
+#   bin/setup          runtime dependencies
+#   bin/setup --dev    plus test dependencies (pytest etc.)
+# Safe to re-run: it only brings the environment in line with bbot/uv.lock.
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+fail() { printf '\n✗ %s\n' "$*" >&2; exit 1; }
+
+UV="$(command -v uv || true)"
+for candidate in "$HOME/.local/bin/uv" "$HOME/.cargo/bin/uv" /opt/homebrew/bin/uv /usr/local/bin/uv; do
+  [ -z "$UV" ] && [ -x "$candidate" ] && UV="$candidate"
+done
+[ -n "$UV" ] || fail "uv is not installed. Install it with one of:
+    brew install uv
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+  then run bin/setup again."
+
+if [ "$(uname -s)" = "Darwin" ]; then
+  # blasthttp has no macOS wheels and is built from source: it needs a C toolchain and OpenSSL
+  xcode-select -p >/dev/null 2>&1 || fail "Xcode Command Line Tools are required: run  xcode-select --install  and then bin/setup again."
+  OPENSSL=""
+  if command -v brew >/dev/null 2>&1; then OPENSSL="$(brew --prefix openssl@3 2>/dev/null || true)"; fi
+  for candidate in /opt/homebrew/opt/openssl@3 /usr/local/opt/openssl@3; do
+    { [ -z "$OPENSSL" ] || [ ! -d "$OPENSSL" ]; } && [ -d "$candidate" ] && OPENSSL="$candidate"
+  done
+  [ -n "$OPENSSL" ] && [ -d "$OPENSSL" ] || fail "OpenSSL 3 from Homebrew is required: run  brew install openssl@3  and then bin/setup again."
+  export OPENSSL_DIR="$OPENSSL" PKG_CONFIG_PATH="$OPENSSL/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+  command -v gtar >/dev/null 2>&1 || echo "! GNU tar is recommended for some modules' binary dependencies: brew install gnu-tar"
+fi
+
+GROUP=()
+[ "${1:-}" = "--dev" ] && GROUP=(--group dev)
+
+echo "Installing dependencies into bbot/.venv (first run builds blasthttp from source and takes a few minutes)…"
+cd "$ROOT/bbot"
+"$UV" sync --python 3.12 ${GROUP[@]+"${GROUP[@]}"}
+
+mkdir -p "$ROOT/scans" "$ROOT/data"
+echo
+echo "✓ Tokosint is installed."
+echo "  Web interface:  bin/web        (then open http://127.0.0.1:8777/)"
+echo "  Command line:   bin/osint -t target.example -f passive -y --no-deps -n <name>"
+echo "  API keys:       Keys tab in the web interface, or config/secrets.yml (template: config/secrets.example.yml)"

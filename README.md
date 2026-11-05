@@ -77,17 +77,20 @@ finds another scan in progress waits for it. Only finished scans are added to a 
 
 ## Installation
 
-Requires Python 3.12 and [uv](https://docs.astral.sh/uv/). On macOS `blasthttp` is built from source against
-Homebrew OpenSSL, and some module dependencies need GNU tar (`brew install gnu-tar`).
+Requirements: [uv](https://docs.astral.sh/uv/) (`brew install uv` or `curl -LsSf https://astral.sh/uv/install.sh | sh`);
+uv downloads Python 3.12 itself. On macOS also the Xcode Command Line Tools (`xcode-select --install`) and Homebrew
+OpenSSL (`brew install openssl@3`): `blasthttp` has no macOS wheels and is built from source; GNU tar
+(`brew install gnu-tar`) is recommended for some modules' binary dependencies.
 
 ```bash
 git clone https://github.com/nickotoko/Tokosint.git && cd Tokosint
-cd bbot && uv sync --python 3.12 --group dev && cd ..
-# macOS:
-# cd bbot && OPENSSL_DIR=/opt/homebrew/opt/openssl@3 PKG_CONFIG_PATH=/opt/homebrew/opt/openssl@3/lib/pkgconfig \
-#   uv sync --python 3.12 --group dev && cd ..
-cp config/secrets.example.yml config/secrets.yml && chmod 600 config/secrets.yml   # API keys are optional
+bin/setup          # creates bbot/.venv; bin/setup --dev also installs the test dependencies
 ```
+
+`bin/setup` checks the requirements and tells what is missing; it is safe to re-run (e.g. after `git pull`).
+The `bin/` scripts refuse to start until the environment exists and point to `bin/setup`.
+API keys are optional: set them on the Keys tab of the web interface, or copy `config/secrets.example.yml` to
+`config/secrets.yml` (mode 600).
 
 The configuration is isolated in `config/` (the `BBOT_CONFIG_DIR` variable, set by the `bin/` scripts); the global
 `~/.config/bbot` is not used.
@@ -111,7 +114,8 @@ bin/module list | restore <name> | archive <name>
 bin/healthcheck
 
 # tests
-cd bbot && .venv/bin/pytest bbot/test/test_step_2/module_tests/test_module_validity.py -q
+bin/setup --dev   # once
+cd bbot && .venv/bin/pytest bbot/test/test_step_2/module_tests/test_module_validity.py -q && cd ..
 bbot/.venv/bin/pytest web/ -q
 ```
 
@@ -138,7 +142,7 @@ bbot/.venv/bin/pytest web/ -q
 
 ```
 bbot/            BBoT 3.0.2 fork (modules, core, tests); bbot/modules_archive/ — modules outside the active set
-bin/             osint (scan), web (UI), module (module set and keys), healthcheck
+bin/             setup (install), osint (scan), web (UI), module (module set and keys), healthcheck
 config/          bbot.yml — project config; secrets.yml — API keys (not in git), secrets.example.yml — template
 web/             server.py, scans.py, validity.py, apikeys.py, health.py, index.html,
                  store.py (SQLite), companies.py (company scans, scheduler), notify.py (Telegram), cronexpr.py

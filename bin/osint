@@ -2,5 +2,6 @@
 # Run the BBoT fork with the isolated project config and scans folder.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+[ -x "$ROOT/bbot/.venv/bin/python" ] || { echo "Tokosint is not installed on this machine yet: run  $ROOT/bin/setup" >&2; exit 1; }
 export BBOT_CONFIG_DIR="$ROOT/config"
 exec "$ROOT/bbot/.venv/bin/bbot" -o "$ROOT/scans" "$@"

@@ -3,5 +3,6 @@
 #   bin/web [port]   start the local backend (default 8777), listens on 127.0.0.1 only
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+[ -x "$ROOT/bbot/.venv/bin/python" ] || { echo "Tokosint is not installed on this machine yet: run  $ROOT/bin/setup" >&2; exit 1; }
 export BBOT_CONFIG_DIR="$ROOT/config"
 exec "$ROOT/bbot/.venv/bin/python" "$ROOT/web/server.py" "${1:-8777}"
