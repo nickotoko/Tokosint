@@ -43,6 +43,40 @@
   input[type=search], select { font: inherit; color: var(--ink); background: var(--panel);
     border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
   input[type=search] { flex: 1; min-width: 180px; }
+  input[type=search].narrow { flex: 0 0 170px; min-width: 0; }
+  input.bad { border-color: #c0392b; outline-color: #c0392b; }
+  td.port { max-width: 140px; white-space: normal; }
+  .chainbox { margin-top: 14px; }
+  .seg { display: flex; gap: 4px; margin: 8px 0; }
+  .graphwrap { overflow: auto; max-height: 60vh; border: 1px solid var(--line); border-radius: 6px; background: var(--bg, transparent); }
+  .chaingraph { display: block; margin: 0 auto; font: 12px system-ui, sans-serif; }
+  .chaingraph .gnode rect { fill: var(--panel, #fff); stroke-width: 1.5; }
+  .chaingraph .gnode.target rect:first-child { stroke-width: 3.5; }
+  .chaingraph .gnode.omitted { opacity: .6; }
+  .chaingraph .gnode.link { cursor: pointer; }
+  .chaingraph .gnode.link:hover rect:first-child { fill: var(--accent-weak, #e8f0ff); }
+  .chaingraph .gtype { font-size: 10px; fill: var(--muted, #6b7480); }
+  .chaingraph .gdata { font-size: 12.5px; font-weight: 600; fill: var(--ink, #1d232b); }
+  .chaingraph .edge { fill: none; stroke: #8a94a3; stroke-width: 1.4; }
+  .chaingraph .edge.back { stroke-dasharray: 5 4; }
+  .chaingraph .arrowhead { fill: #8a94a3; }
+  .chaingraph .edgelabel { font-size: 10.5px; fill: var(--ink, #1d232b); paint-order: stroke; stroke: var(--panel, #fff); stroke-width: 4px; }
+  .legend { font-size: 11px; margin-top: 4px; }
+  .chain { margin-top: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; }
+  .chain-title { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+  .chain ol { margin: 0; padding-left: 20px; }
+  .chain li { margin: 6px 0; }
+  .chain li.omitted { opacity: .7; }
+  .chain .step-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+  .chain .step-head b, .chain .step-head a { word-break: break-all; }
+  .chain .ctxline { font-size: 12px; margin-top: 2px; }
+  .statusform { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line, #ddd); }
+  .statusform h3 { margin: 0 0 6px; font-size: 14px; }
+  .muted.manual { font-style: italic; }
+  .problems { margin: 0 0 14px; padding: 8px 10px; border: 1px solid color-mix(in srgb, #d64545 40%, transparent); border-radius: 6px; }
+  .problems h3 { margin: 0 0 6px; font-size: 14px; color: #d64545; }
+  td.quota { font-size: 12px; min-width: 170px; }
+  tr.problem td { background: color-mix(in srgb, #d64545 6%, transparent); }
   .count { color: var(--muted); font-size: 13px; }
   /* overflow: clip keeps the rounded corners without making the wrapper a scroll container:
      with overflow-x: auto the sticky headers stuck to the wrapper instead of the page and covered the first row */
@@ -117,6 +151,10 @@
   .form .err { color: #d64545; font-size: 13px; margin-right: auto; }
   td.data .desc { font-family: system-ui, sans-serif; margin-top: 3px; word-break: normal; }
   .chip.sev { margin-top: 4px; font-weight: 600; }
+  .enplan { margin: 10px 0 4px; padding: 8px 10px; border-radius: 6px; background: var(--accent-weak); font-size: 13px; line-height: 1.5; }
+  .enplan .muted { font-size: 12px; }
+  .chip.code { font-family: var(--mono); font-weight: 600; margin-right: 4px; }
+  .chip.code.c2 { color: #2e9d5b; } .chip.code.c3 { color: var(--accent); } .chip.code.c4 { color: var(--warn); } .chip.code.c5 { color: #d64545; }
   .chip.sev.high, .chip.sev.critical { color: #d64545; } .chip.sev.medium { color: var(--warn); }
   .ctx { font-size: 12.5px; margin: 4px 0; } .ctx b { font-family: var(--mono); font-weight: 600; }
   .keyform { display: flex; gap: 6px; } .keyform input { font: 12.5px var(--mono); padding: 5px 8px; border: 1px solid var(--line);
@@ -145,6 +183,35 @@
   .chip b { color: var(--ink); font-weight: 600; margin-left: 3px; }
   .st.failed, .st.error { color: #d64545; background: color-mix(in srgb, #d64545 14%, transparent); }
   a.theme { margin-left: auto; color: var(--muted); cursor: pointer; font-size: 13px; }
+
+  /* ---- how it works ---- */
+  .doc { max-width: 1060px; margin: 0 auto; }
+  .doc .panel { margin-bottom: 14px; }
+  .doc h2 { margin: 0 0 8px; } .doc h3 { margin: 0 0 8px; }
+  .doc p { line-height: 1.55; margin: 6px 0; }
+  .doc-toc { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0 0 12px; font-size: 13px; }
+  .doc-toc a, .doc a { color: var(--accent); text-decoration: none; }
+  .doc .two { display: grid; grid-template-columns: 360px 1fr; gap: 18px; align-items: center; }
+  .doc .rule { font-family: var(--mono); background: var(--accent-weak); padding: 6px 10px; border-radius: 6px; display: inline-block; }
+  .doc .k { padding: 1px 6px; border-radius: 4px; font-size: 12.5px; }
+  .doc .k.prod { background: #ff8400; color: #000; } .doc .k.cons { background: #fff; color: #000; border: 1px solid var(--line); }
+  .doc table.doc-t td { vertical-align: top; } .doc table.doc-t td:first-child { white-space: nowrap; }
+  svg.diag { width: 100%; height: auto; margin: 8px 0; font-family: inherit; }
+  svg.diag text { fill: var(--ink); font-size: 13px; text-anchor: middle; }
+  svg.diag text.sm { fill: var(--muted); font-size: 11px; } svg.diag text.l { text-anchor: start; } svg.diag text.b { font-weight: 700; font-size: 16px; }
+  svg.diag .box rect { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
+  svg.diag .box.hl > rect { fill: var(--accent-weak); stroke: var(--accent); stroke-dasharray: 4 3; }
+  svg.diag .box.acc rect { stroke: var(--accent); stroke-width: 2; }
+  svg.diag .node rect { fill: var(--panel); stroke: #8a94a3; stroke-width: 2; }
+  svg.diag .node.valid rect { stroke: #2e9d5b; } svg.diag .node.historical rect { stroke: #c98a12; } svg.diag .node.false rect { stroke: #d64545; }
+  svg.diag .ln { fill: none; stroke: var(--muted); stroke-width: 1.6; } svg.diag .ln.dash { stroke-dasharray: 5 4; }
+  svg.diag .ln.loop { stroke: var(--accent); stroke-width: 2; } svg.diag .loopt { fill: var(--accent); }
+  svg.diag .ar { fill: var(--muted); }
+  svg.diag .ring { fill: none; stroke-width: 1.5; } svg.diag .ring.r0 { fill: color-mix(in srgb, #2e9d5b 16%, transparent); stroke: #2e9d5b; }
+  svg.diag .ring.r1 { fill: color-mix(in srgb, #c98a12 8%, transparent); stroke: #c98a12; } svg.diag .ring.r2 { stroke: var(--line); }
+  /* BBOT's chord graph is drawn for a dark background: keep it dark in both themes */
+  .chordwrap { background: #1b1f24; border-radius: 10px; padding: 10px; overflow-x: auto; display: flex; justify-content: center; }
+  @media (max-width: 800px) { .doc .two { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -156,6 +223,7 @@
     <button id="tab-companies">Companies</button>
     <button id="tab-sources">Sources</button>
     <button id="tab-keys">Keys</button>
+    <button id="tab-howto">How it works</button>
   </nav>
   <a class="theme" id="theme">theme</a>
 </header>
@@ -202,8 +270,10 @@
       <button class="btn primary" id="r-new">＋ New scan</button>
       <select id="r-scan"><option value="">— choose a scan —</option></select>
       <button class="btn" id="r-report" disabled>Source report</button>
+      <button class="btn" id="r-enrich" disabled title="Run new sources over the findings this scan already has">Enrich</button>
       <button class="btn" id="r-export" disabled>Export</button>
       <input type="search" id="r-q" placeholder="Search findings…" />
+      <input type="search" id="r-port" class="narrow" placeholder="Port: 443, 8000-9000" title="Ports: a list and ranges, e.g. 22,80,443 or 8000-9000" />
       <select id="r-type"><option value="">all types</option></select>
       <select id="r-source"><option value="">all sources</option></select>
       <select id="r-status">
@@ -213,9 +283,13 @@
         <option value="false">false</option>
         <option value="none">untagged</option>
       </select>
+      <select id="r-http" title="HTTP status code of URLs">
+        <option value="">HTTP: any</option>
+      </select>
       <select id="r-owner">
         <option value="">ownership: any</option>
         <option value="own">target assets</option>
+        <option value="related">via related domains</option>
         <option value="third">third party</option>
       </select>
       <span class="count" id="r-count"></span>
@@ -233,9 +307,11 @@
     <div class="tablewrap"><table id="r-table"><thead><tr>
       <th class="sortable" data-k="type">Type</th>
       <th class="sortable" data-k="data">Finding</th>
+      <th class="sortable num" data-k="port">Port</th>
+      <th class="sortable num" data-k="http" title="HTTP status code of a URL (http module)">HTTP</th>
       <th class="sortable" data-k="nsources">Sources</th>
       <th class="sortable" data-k="status">Status</th>
-      <th class="sortable" data-k="seen">Last seen</th>
+      <th class="sortable" data-k="last_seen" title="The latest date the sources report for the finding (empty: no source gives a date)">Last seen</th>
     </tr></thead><tbody id="r-body"></tbody></table></div>
     <div class="empty" id="r-empty">Choose a scan to see its findings.</div>
   </section>
@@ -267,6 +343,187 @@
       <th>Schedules</th><th>Alerts</th><th></th>
     </tr></thead><tbody id="c-body"></tbody></table></div>
     <div class="empty" id="c-empty" hidden>No companies yet. Create one, then start scans for it or attach existing scans.</div>
+  </section>
+
+  <section id="view-howto" hidden>
+    <div class="doc">
+      <nav class="doc-toc">
+        <a href="#h-engine">Recursive engine</a><a href="#h-scope">Scope distance</a><a href="#h-modules">Modules</a>
+        <a href="#h-status">Status of a finding</a><a href="#h-checks">Validation checks</a><a href="#h-owner">Whose is it</a>
+        <a href="#h-related">Related domains</a><a href="#h-paths">One finding, many paths</a><a href="#h-dates">Dates &amp; quotas</a>
+      </nav>
+
+      <div class="panel">
+        <h2>How Tokosint works</h2>
+        <p>Tokosint is a fork of <b>BBOT</b> (an OSINT recursion engine) with strict validation of every finding and of every
+        relation between findings. BBOT answers "what can be found from this target"; Tokosint adds "is it real now,
+        is it really the target's, and how do we know". Passive sources only: nothing here touches the target directly,
+        except DNS resolution through public resolvers.</p>
+      </div>
+
+      <div class="panel" id="h-engine">
+        <h3>1. The recursive engine</h3>
+        <p>Everything is an <b>event</b>: a hostname, an IP, a port, a technology, an email. A scan starts from <b>seeds</b>
+        (the target) and pushes every event through one pipeline. Each module watches some event types and emits new
+        events, which go back to the start of the same pipeline - so a subdomain found by one source is resolved, classified,
+        validated and then handed to every other source that wants subdomains. Recursion stops on its own: an event that was
+        already seen is dropped (dedup), and an event too far from the target is not handed to modules (scope distance).</p>
+        <svg class="diag" viewBox="0 0 960 250" role="img" aria-label="BBOT event pipeline">
+          <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="ar"/></marker></defs>
+          <g class="box"><rect x="10" y="110" width="110" height="60" rx="8"/><text x="65" y="136">Seeds</text><text x="65" y="154" class="sm">target</text></g>
+          <g class="box"><rect x="150" y="110" width="120" height="60" rx="8"/><text x="210" y="136">Ingress</text><text x="210" y="154" class="sm">dedup · blacklist</text></g>
+          <g class="box hl"><rect x="300" y="60" width="300" height="160" rx="10"/><text x="450" y="84">Intercept chain (in order)</text></g>
+          <g class="box"><rect x="316" y="100" width="84" height="100" rx="7"/><text x="358" y="135">dnsresolve</text><text x="358" y="152" class="sm">A/AAAA/CNAME</text><text x="358" y="166" class="sm">MX/NS/TXT/PTR</text><text x="358" y="186" class="sm">prio 1</text></g>
+          <g class="box"><rect x="408" y="100" width="84" height="100" rx="7"/><text x="450" y="135">ipowner</text><text x="450" y="152" class="sm">whose IP</text><text x="450" y="166" class="sm">(+cloudcheck)</text><text x="450" y="186" class="sm">prio 3</text></g>
+          <g class="box acc"><rect x="500" y="100" width="84" height="100" rx="7"/><text x="542" y="135">validity</text><text x="542" y="152" class="sm">status</text><text x="542" y="166" class="sm">false → out</text><text x="542" y="186" class="sm">prio 4</text></g>
+          <g class="box"><rect x="630" y="110" width="110" height="60" rx="8"/><text x="685" y="136">Egress</text><text x="685" y="154" class="sm">scope · graph</text></g>
+          <g class="box"><rect x="770" y="40" width="170" height="44" rx="8"/><text x="855" y="67">source modules</text></g>
+          <g class="box"><rect x="770" y="118" width="170" height="44" rx="8"/><text x="855" y="137">output</text><text x="855" y="152" class="sm">output.json · CSV · txt</text></g>
+          <g class="box"><rect x="770" y="196" width="170" height="44" rx="8"/><text x="855" y="215">validity_false.jsonl</text><text x="855" y="230" class="sm">false + reason</text></g>
+          <path d="M120,140H148" class="ln" marker-end="url(#ar)"/><path d="M270,140H298" class="ln" marker-end="url(#ar)"/>
+          <path d="M400,150H406" class="ln"/><path d="M492,150H498" class="ln"/>
+          <path d="M600,140H628" class="ln" marker-end="url(#ar)"/>
+          <path d="M740,132L768,66" class="ln" marker-end="url(#ar)"/><path d="M740,140H768" class="ln" marker-end="url(#ar)"/>
+          <path d="M584,200 C640,250 700,250 768,222" class="ln dash" marker-end="url(#ar)"/>
+          <path d="M855,40 C855,6 210,6 210,108" class="ln loop" marker-end="url(#ar)"/>
+          <text x="530" y="20" class="sm loopt">new events go back to Ingress: recursion</text>
+        </svg>
+        <p class="muted">Intercept modules see every event before anyone else and in a fixed order; an intercept module in error
+        state would stop the whole pipeline, so they are kept small and never fail on bad config. Output, false findings and
+        per-source request statistics (<code>module_stats.json</code>) are written to <code>scans/&lt;scan&gt;/</code>.</p>
+      </div>
+
+      <div class="panel" id="h-scope">
+        <h3>2. Scope distance</h3>
+        <div class="two">
+          <svg class="diag" viewBox="0 0 360 300" role="img" aria-label="Scope distance rings">
+            <circle cx="180" cy="150" r="140" class="ring r2"/><circle cx="180" cy="150" r="95" class="ring r1"/><circle cx="180" cy="150" r="50" class="ring r0"/>
+            <text x="180" y="146" class="b">0</text><text x="180" y="164" class="sm">target.example</text><text x="180" y="178" class="sm">*.target.example</text>
+            <text x="180" y="74" class="b">1</text><text x="180" y="90" class="sm">IPs · NS/MX providers</text>
+            <text x="180" y="26" class="b">2</text><text x="180" y="40" class="sm">IP of the provider · its AS</text>
+          </svg>
+          <div>
+            <p>Every event carries its distance from the target: <b>0</b> - the target and its subdomains (and domains promoted into
+            scope, see <a href="#h-related">related domains</a>), <b>1</b> - one hop away (an IP an in-scope name resolves to,
+            the target's DNS or mail provider), <b>2+</b> - further.</p>
+            <p><b>search distance</b> decides which events modules may work on (sources look up in-scope names; modules that need
+            IPs of in-scope names accept one extra hop); <b>report distance</b> decides what reaches the output. Distance alone
+            says nothing about whose a finding is - that is what validation is for.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="h-modules">
+        <h3>3. Modules and event types</h3>
+        <p>Each module does one thing: query one API, resolve, classify. It declares the event types it <b>consumes</b> and
+        <b>produces</b>; the engine wires them together. Hover a module or an event type to see its links:
+        <span class="k prod">produces</span> / <span class="k cons">consumes</span>.
+        <span class="muted" id="h-chord-stat"></span></p>
+        <div class="chordwrap"><div id="h-chord"></div></div>
+        <p class="muted">Every source module also declares <code>meta.freshness</code> - <b>current</b> (the source sees the internet
+        now: DNS, live scanners), <b>historical</b> (archives, passive DNS, certificate logs) or <b>inherit</b> (derived from the
+        parent: an IP of a port). It is the start of the status rule below.</p>
+      </div>
+
+      <div class="panel" id="h-status">
+        <h3>4. Status of a finding</h3>
+        <p>Every finding is <span class="st valid">valid</span> (exists now), <span class="st historical">historical</span>
+        (existed, not confirmed now) or <span class="st false">false</span> (not real or not the target's). The status is
+        computed along the discovery path:</p>
+        <p class="rule">status = min(freshness of the source, status of the parent) &nbsp;·&nbsp; a <b>verified</b> check lifts it to valid</p>
+        <svg class="diag" viewBox="0 30 960 76" role="img" aria-label="Status along a path">
+          <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" class="ar"/></marker></defs>
+          <g class="node valid"><rect x="10" y="40" width="170" height="56" rx="8"/><text x="95" y="64">target.example</text><text x="95" y="82" class="sm">seed · valid</text></g>
+          <g class="node historical"><rect x="240" y="40" width="190" height="56" rx="8"/><text x="335" y="64">old.target.example</text><text x="335" y="82" class="sm">crt log (historical) → historical</text></g>
+          <g class="node historical"><rect x="490" y="40" width="190" height="56" rx="8"/><text x="585" y="64">203.0.113.7</text><text x="585" y="82" class="sm">pDNS of a historical name</text></g>
+          <g class="node valid"><rect x="740" y="40" width="210" height="56" rx="8"/><text x="845" y="64">old.target.example</text><text x="845" y="82" class="sm">resolves now → verified → valid</text></g>
+          <path d="M180,68H238" class="ln" marker-end="url(#ar2)"/><path d="M430,68H488" class="ln" marker-end="url(#ar2)"/>
+          <path d="M680,68H738" class="ln dash" marker-end="url(#ar2)"/>
+          <text x="209" y="60" class="sm">crt</text><text x="459" y="60" class="sm">robtex</text><text x="709" y="60" class="sm">DNS</text>
+        </svg>
+        <p class="muted">A child can never be fresher than its parent unless something confirms it now: an IP found in an archive
+        record of a dead name stays historical. False findings are removed from the scan (modules never work on them) and kept
+        with the reason in <code>validity_false.jsonl</code>; their descendants are false too.</p>
+      </div>
+
+      <div class="panel" id="h-checks">
+        <h3>5. Validation checks</h3>
+        <p>Run by <code>validity</code> on every event, from what is already known (DNS records, tags) - never by contacting the target.
+        The strongest verdict wins: false &gt; unrelated &gt; historical &gt; verified.</p>
+        <div class="tablewrap"><table class="doc-t"><thead><tr><th>Check</th><th>Applies to</th><th>Verdict</th></tr></thead><tbody>
+          <tr><td><b>Junk</b></td><td>names, emails</td><td><span class="st false">false</span> no public suffix (<code>hand@3x.png</code>), reserved domains, placeholder emails (<code>user@…</code>), <code>owner-unverified</code> profiles, BBOT's wildcard placeholder <code>_wildcard.*</code> and anything on it</td></tr>
+          <tr><td><b>Relation</b></td><td>out-of-scope names</td><td><span class="st false">false, hidden</span> unless the relation is proven: a DNS record of a valid parent (the target's NS/MX/CNAME - the target uses it) or a module that proves relations (related_domains). A link on a page, a shared IP or certificate prove nothing. Hidden names stay visible to related_domains.</td></tr>
+          <tr><td><b>Host relation</b></td><td>port / URL / technology</td><td><span class="st false">false</span> when a search source reports it on an out-of-scope host directly (not through a checked name): <code>shop.other.example:443</code> from a search for target.example</td></tr>
+          <tr><td><b>DNS</b></td><td>names</td><td><span class="st historical">historical</span> NXDOMAIN / empty, CNAME without an address (dangling); no verdict on resolution errors or wildcard answers (a wildcard resolves anything); <span class="st valid">verified</span> an in-scope name resolves</td></tr>
+          <tr><td><b>HTTP</b></td><td>URLs with a live answer</td><td><span class="st historical">historical</span> 404/410; no verdict on 5xx/400; <span class="st valid">verified</span> an in-scope resource answers</td></tr>
+        </tbody></table></div>
+        <p class="muted">Sources validate their own results too: FOFA results must be the searched domain, its subdomain, or a server
+        presenting the domain's certificate (FOFA's <code>*=</code> is a substring match: <code>*n1.example</code> would match
+        <code>shopn1.example</code>); reverse lookups (names on an IP) are skipped on shared hosting and CDN addresses.</p>
+      </div>
+
+      <div class="panel" id="h-owner">
+        <h3>6. Whose is it: third parties and IP ownership</h3>
+        <svg class="diag" viewBox="0 0 960 216" role="img" aria-label="IP ownership decision">
+          <defs><marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" class="ar"/></marker></defs>
+          <g class="box"><rect x="10" y="80" width="120" height="50" rx="8"/><text x="70" y="110">IP address</text></g>
+          <g class="box"><rect x="190" y="10" width="250" height="40" rx="7"/><text x="315" y="35">PTR into the target / AS named like it</text></g>
+          <g class="box"><rect x="190" y="62" width="250" height="40" rx="7"/><text x="315" y="87">reached via CNAME to a foreign domain</text></g>
+          <g class="box"><rect x="190" y="114" width="250" height="40" rx="7"/><text x="315" y="139">address of an out-of-scope name</text></g>
+          <g class="box"><rect x="190" y="160" width="270" height="50" rx="7"/><text x="325" y="181">AS: anti-DDoS / CDN / SaaS · cloud</text><text x="325" y="199" class="sm">Cloudflare, Qrator, WordPress.com · Yandex Cloud</text></g>
+          <g class="node valid"><rect x="520" y="10" width="200" height="40" rx="7"/><text x="620" y="35">ip-owner-target</text></g>
+          <g class="node historical"><rect x="520" y="88" width="200" height="40" rx="7"/><text x="620" y="113">ip-proxy → third-party</text></g>
+          <g class="node"><rect x="520" y="170" width="200" height="40" rx="7"/><text x="620" y="195">ip-hosting (unchanged)</text></g>
+          <path d="M130,105L188,30" class="ln" marker-end="url(#ar3)"/><path d="M130,105L188,82" class="ln" marker-end="url(#ar3)"/>
+          <path d="M130,105L188,134" class="ln" marker-end="url(#ar3)"/><path d="M130,105L188,184" class="ln" marker-end="url(#ar3)"/>
+          <path d="M440,30H518" class="ln" marker-end="url(#ar3)"/><path d="M440,82L518,104" class="ln" marker-end="url(#ar3)"/>
+          <path d="M440,134L518,112" class="ln" marker-end="url(#ar3)"/><path d="M460,176L518,118" class="ln dash" marker-end="url(#ar3)"/>
+          <path d="M460,190H518" class="ln dash" marker-end="url(#ar3)"/>
+          <text x="736" y="98" class="sm l">ports and products of a proxy IP</text>
+          <text x="736" y="113" class="sm l">belong to the provider: not target assets,</text>
+          <text x="736" y="128" class="sm l">no reverse lookups, no host details</text>
+        </svg>
+        <p><b>third-party</b>: the relation is real ("the target uses it") but it is not a target asset - the target's mail and DNS
+        providers (names from its MX/NS/TXT records), proxy fronts, and what is found on them. Shown as valid, marked
+        <i>third party</i>, filterable in Analysis.</p>
+      </div>
+
+      <div class="panel" id="h-related">
+        <h3>7. Related domains</h3>
+        <p>A second brand or a subsidiary lives on another domain. <code>related_domains</code> collects DNS evidence for every
+        out-of-scope domain seen next to the target and promotes it into scope only with a <b>backref</b> - the candidate's own
+        records point at the target (a provider never points its records at a customer):</p>
+        <svg class="diag" viewBox="0 0 960 170" role="img" aria-label="Related domain evidence">
+          <defs><marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" class="ar"/></marker></defs>
+          <g class="node valid"><rect x="20" y="60" width="200" height="50" rx="8"/><text x="120" y="90">target.example</text></g>
+          <g class="node"><rect x="740" y="60" width="200" height="50" rx="8"/><text x="840" y="90">subsidiary.example</text></g>
+          <path d="M738,72 C560,20 400,20 222,72" class="ln" marker-end="url(#ar4)"/>
+          <text x="480" y="26" class="sm">backref +3: its NS / MX / SPF / DMARC is in scope (required)</text>
+          <path d="M222,98 C400,150 560,150 738,98" class="ln dash" marker-end="url(#ar4)"/>
+          <text x="480" y="160" class="sm">forward +1: the target's NS / MX / SPF point at it · neighbor / email +1</text>
+        </svg>
+        <p class="muted">Promotion needs a backref and a score ≥ 4. Everything found through the promoted domain is marked
+        <i>via subsidiary.example</i> in Analysis (filter "via related domains"), so the subsidiary's assets are not mixed with
+        the target's own.</p>
+      </div>
+
+      <div class="panel" id="h-paths">
+        <h3>8. One finding, many paths</h3>
+        <p>A finding often arrives several ways: first from an archive, later from a live source. The web view recomputes the
+        status over the whole graph of observations: <span class="rule">status(finding) = max over paths of the path status</span>,
+        so the best evidence wins. The asset card shows every path as a graph (Show discovery chain).
+        An analyst can set a status by hand; the computed one is kept next to it and every change is logged
+        (<code>status_overrides</code>) to improve the rules.</p>
+      </div>
+
+      <div class="panel" id="h-dates">
+        <h3>9. Dates, requests and quotas</h3>
+        <p><b>Last seen</b> is the date the source itself reports (passive DNS <i>time_last</i>, FOFA <i>lastupdatetime</i>,
+        a Shodan banner timestamp, OTX / LeakIX / Netlas dates); empty when the source gives no date. <b>Scan date</b> is when
+        the scan ran. Every API request of every source is counted with its outcome (ok, rate limit, quota, auth, unavailable)
+        and the account quota is read before and after a scan - the scan report shows what failed and what was spent.</p>
+      </div>
+    </div>
   </section>
 
   <section id="view-keys" hidden>
@@ -325,17 +582,37 @@
     <label for="scan-mode">Sources</label>
     <select id="scan-mode">
       <option value="all">the whole passive set (-f passive)</option>
-      <option value="pick">pick sources</option>
+      <option value="custom">custom: all checked, uncheck the unwanted</option>
+      <option value="pick">pick sources: none checked</option>
     </select>
     <div id="scan-pick" hidden>
       <div class="srcgrid" id="scan-sources"></div>
-      <div class="hint" id="scan-pick-count"></div>
+      <div class="hint"><span id="scan-pick-count"></span> · <a href="#" id="scan-check-all">check all passive</a> · <a href="#" id="scan-check-none">uncheck all</a></div>
     </div>
     <div class="hint">Requests go to third-party sources and spend their quotas. One scan at a time.</div>
     <div class="actions">
       <span class="err" id="scan-err"></span>
       <button class="btn" id="scan-cancel">Cancel</button>
       <button class="btn primary" id="scan-go">Start</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlg-enrich" class="wide">
+  <div class="dlg-head"><h2>Enrich <span id="en-scan"></span></h2><button class="x" id="en-x">&times;</button></div>
+  <div class="dlg-body form">
+    <div class="hint">Runs the chosen sources over the findings this scan already has, in the same scope (its targets and
+    the domains promoted into scope). Valid and historical findings of the types the sources take are the seeds; third-party
+    and false ones are not. A historical finding stays historical, and so does what a source finds on it. The result is a
+    separate scan shown together with this one; a company scan feeds the company's timeline.</div>
+    <label>Sources</label>
+    <input type="text" id="en-q" placeholder="filter sources…" />
+    <div class="srcgrid" id="en-sources"></div>
+    <div class="enplan" id="en-plan">Pick the sources to see what will be sent.</div>
+    <div class="actions">
+      <span class="err" id="en-err"></span>
+      <button class="btn" id="en-cancel">Cancel</button>
+      <button class="btn primary" id="en-go" disabled>Start enrichment</button>
     </div>
   </div>
 </dialog>
@@ -448,20 +725,50 @@ window.addEventListener("resize", syncHeadHeight);
 
 // ---- tabs ----
 function show(which) {
-  for (const v of ["results", "timeline", "companies", "sources", "keys"]) {
+  for (const v of ["results", "timeline", "companies", "sources", "keys", "howto"]) {
     $("#view-" + v).hidden = v !== which;
     $("#tab-" + v).classList.toggle("on", v === which);
   }
   if (which === "keys") { loadKeys(); loadTelegram(); }
   if (which === "companies") loadCompanies();
   if (which === "timeline") loadCompanies().then(loadTimeline);
+  if (which === "howto") loadChord();
 }
 $("#tab-results").onclick = () => show("results");
 $("#tab-sources").onclick = () => show("sources");
 $("#tab-keys").onclick = () => show("keys");
 $("#tab-timeline").onclick = () => show("timeline");
 $("#tab-companies").onclick = () => show("companies");
+$("#tab-howto").onclick = () => show("howto");
 if (location.hash === "#timeline") show("timeline");
+if (location.hash === "#howto") show("howto");
+
+// ---- how it works: BBOT's chord graph of modules <-> event types (the same Vega spec, our modules) ----
+let CHORD_DONE = false;
+function loadScript(src) {
+  return new Promise((ok, fail) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = fail; document.head.appendChild(s); });
+}
+async function loadChord() {
+  if (CHORD_DONE) return;
+  CHORD_DONE = true;
+  try {
+    if (!window.vegaEmbed) {
+      await loadScript("/static/vega/vega.js");
+      await loadScript("/static/vega/vega-lite.js");
+      await loadScript("/static/vega/vega-embed.js");
+    }
+    const [spec, data] = await Promise.all([fetch("/static/vega/chord.json").then((r) => r.json()), fetch("/api/chord").then((r) => r.json())]);
+    for (const d of spec.data) {
+      if (d.name === "entities") { delete d.url; d.values = data.entities; }
+      if (d.name === "rels") { delete d.url; d.values = data.rels; }
+    }
+    $("#h-chord-stat").textContent = `${data.modules} modules, ${data.event_types} event types.`;
+    await vegaEmbed("#h-chord", spec, { renderer: "svg", actions: false });
+  } catch (e) {
+    CHORD_DONE = false;
+    $("#h-chord").textContent = "Could not draw the graph: " + e;
+  }
+}
 
 function fillSelect(sel, values, keepFirst = true) {
   while (sel.options.length > (keepFirst ? 1 : 0)) sel.remove(sel.options.length - 1);
@@ -559,8 +866,77 @@ const IOC_LABEL = { valid: "valid", historical: "historical", false: "false" };
 const DNS_LABEL = { ok: "resolves", nxdomain: "does not resolve", dangling: "dangling CNAME", wildcard: "wildcard", error: "DNS error" };
 const dnsCheckOf = (a) => { const t = (a.tags || []).find((x) => x.startsWith("dns-check-")); return t ? t.slice(10) : null; };
 const isThird = (a) => (a.tags || []).includes("third-party");
+// HTTP status of a URL: a chip per code, colored by class; a redirect shows where it leads
+function httpChips(a, withRedirect = true) {
+  const box = el("span", "http");
+  for (const code of a.http_status) {
+    const c = el("span", "chip code c" + String(code)[0], String(code));
+    c.title = code < 300 ? "the resource answers" : code < 400 ? "redirect" : code < 500 ? "client error (404/410: the resource is gone)" : "server error";
+    box.appendChild(c);
+  }
+  const loc = withRedirect && a.details && a.details.redirect_location;
+  if (loc) box.appendChild(el("span", "muted", " → " + (loc.length > 120 ? loc.slice(0, 120) + "…" : loc)));
+  return box;
+}
+// HTTP filter: "" any, "c2".."c5" a class, "none" no code, "301" an exact code
+function httpMatch(a, v) {
+  if (!v) return true;
+  const codes = a.http_status || [];
+  if (v === "none") return !codes.length;
+  if (v[0] === "c") return codes.some((c) => String(c)[0] === v[1]);
+  return codes.includes(Number(v));
+}
+function fillHttpFilter() {
+  const sel = $("#r-http"), cur = sel.value, count = {}, cls = {};
+  ASSETS.forEach((a) => (a.http_status || []).forEach((c) => { count[c] = (count[c] || 0) + 1; cls[String(c)[0]] = (cls[String(c)[0]] || 0) + 1; }));
+  while (sel.options.length > 1) sel.remove(1);
+  const add = (v, t) => { const o = el("option", null, t); o.value = v; sel.appendChild(o); };
+  for (const k of Object.keys(cls).sort()) add("c" + k, `${k}xx (${cls[k]})`);
+  if (Object.keys(count).length) add("none", "no code");
+  for (const c of Object.keys(count).map(Number).sort((x, y) => x - y)) add(String(c), `${c} (${count[c]})`);
+  sel.value = [...sel.options].some((o) => o.value === cur) ? cur : "";
+}
+// "domains (2nd level)": DNS names that are a registrable domain themselves (example.com, example.co.uk)
+const DOMAIN_TYPE = "@domain";
+const typeMatch = (a, type) => !type || (type === DOMAIN_TYPE ? !!a.registrable : a.type === type);
+function addDomainOption(sel) {
+  if (!ASSETS.some((a) => a.registrable)) return;
+  const o = el("option", null, `domains (2nd level): ${ASSETS.filter((a) => a.registrable).length}`);
+  o.value = DOMAIN_TYPE;
+  const first = [...sel.options].find((x) => x.value === "DNS_NAME");
+  sel.insertBefore(o, first ? first.nextSibling : null);
+}
+// related domains (promoted by related_domains: a subsidiary, a second brand) every path of the finding goes through
+const viaOf = (a) => a.via || [];
+const ownerOf = (a) => isThird(a) ? "third" : viaOf(a).length ? "related" : "own";
 const IOC_RANK = { valid: 2, historical: 1, false: 0.5 };
-const sortKey = (a, k) => k === "nsources" ? a.sources.length : k === "seen" ? (a.seen || 0) : k === "status" ? (IOC_RANK[a.status] || 0) : a[k];
+const sortKey = (a, k) => k === "nsources" ? a.sources.length : k === "last_seen" ? (a.last_seen || 0) : k === "status" ? (IOC_RANK[a.status] || 0)
+  : k === "port" ? ((a.ports || [])[0] || 0)
+  // findings without a code sort after every code
+  : k === "http" ? ((a.http_status || [])[0] || 999) : a[k];
+// "22, 80,443 8000-9000" -> [[22,22],[80,80],[443,443],[8000,9000]]; null - empty, false - not a port list
+function parsePorts(raw) {
+  const parts = raw.split(/[\s,;]+/).filter(Boolean);
+  if (!parts.length) return null;
+  const out = [];
+  for (const p of parts) {
+    const m = p.match(/^(\d{1,5})(?:-(\d{1,5}))?$/);
+    if (!m) return false;
+    const lo = Number(m[1]), hi = Number(m[2] || m[1]);
+    out.push([Math.min(lo, hi), Math.max(lo, hi)]);
+  }
+  return out;
+}
+const portMatch = (a, ranges) => (a.ports || []).some((p) => ranges.some(([lo, hi]) => p >= lo && p <= hi));
+// cpe:2.3:a:f5:nginx:1.2 -> "nginx 1.2 (f5)"; other technology strings are shown as they are
+function techLabel(t) {
+  const m = String(t).match(/^cpe:(?:2\.3:|\/)([aho]):([^:]+):([^:]+)(?::([^:]+))?/);
+  if (!m) return t;
+  const ver = m[4] && m[4] !== "*" && m[4] !== "-" ? " " + m[4] : "";
+  const name = m[3].replace(/_/g, " ") + ver;
+  return m[2] === m[3] ? name : `${name} (${m[2].replace(/_/g, " ")})`;
+}
+const techWhere = (a) => (a.on || []).map((o) => o.ports.length ? o.ports.map((p) => `${o.host}:${p}`).join(", ") : o.host).join(", ");
 const fmtSeen = (ts) => {
   if (!ts) return "—";
   const d = new Date(ts * 1000);
@@ -571,11 +947,15 @@ function renderResults() {
   const body = $("#r-body"), empty = $("#r-empty");
   if (!ASSETS.length) { body.innerHTML = ""; empty.hidden = false; $("#r-count").textContent = ""; return; }
   empty.hidden = true;
+  const ports = parsePorts($("#r-port").value);
+  $("#r-port").classList.toggle("bad", ports === false);
   const q = $("#r-q").value.trim().toLowerCase(), type = $("#r-type").value, src = $("#r-source").value, rst = $("#r-status").value, own = $("#r-owner").value;
   const rows = ASSETS.filter((a) =>
-    (!q || a.data.toLowerCase().includes(q)) && (!type || a.type === type) && (!src || a.sources.includes(src)) &&
+    (!q || a.data.toLowerCase().includes(q) || (a.hosts || []).some((h) => h.toLowerCase().includes(q)) ||
+      (a.type === "TECHNOLOGY" && techLabel(a.data).toLowerCase().includes(q))) &&
+    (!ports || portMatch(a, ports)) && typeMatch(a, type) && httpMatch(a, $("#r-http").value) && (!src || a.sources.includes(src)) &&
     (!rst || (a.status || "none") === rst) &&
-    (!own || (own === "third") === isThird(a)));
+    (!own || ownerOf(a) === own));
   rows.sort((a, b) => {
     const x = sortKey(a, rSort.k), y = sortKey(b, rSort.k);
     return ((x < y ? -1 : x > y ? 1 : 0) * rSort.dir) || (b.sources.length - a.sources.length) || a.data.localeCompare(b.data);
@@ -584,27 +964,44 @@ function renderResults() {
   for (const a of rows) {
     const tr = el("tr");
     const tdT = el("td", "type"); tdT.appendChild(el("span", "chip", a.type)); tr.appendChild(tdT);
-    const tdD = el("td", "data", a.data);
+    const tdD = el("td", "data", a.type === "TECHNOLOGY" ? techLabel(a.data) : a.data);
+    if (a.type === "TECHNOLOGY") {
+      if (techLabel(a.data) !== a.data) tdD.appendChild(el("div", "muted", a.data));
+      const w = techWhere(a); if (w) tdD.appendChild(el("div", "muted desc", "on " + (w.length > 220 ? w.slice(0, 220) + "…" : w)));
+    }
     const desc = a.details && a.details.description;
     if (desc) { const d = el("div", "muted desc", desc.length > 220 ? desc.slice(0, 220) + "…" : desc); tdD.appendChild(d); }
     if (a.details && a.details.severity) tdD.appendChild(el("span", "chip sev " + a.details.severity.toLowerCase(), a.details.severity));
+    const loc = a.details && a.details.redirect_location;
+    if (loc) tdD.appendChild(el("div", "muted desc", "→ " + (loc.length > 160 ? loc.slice(0, 160) + "…" : loc)));
     tr.appendChild(tdD);
+    tr.appendChild(el("td", "num port", (a.ports || []).length ? a.ports.join(", ") : "—"));
+    const tdH = el("td", "num"); if ((a.http_status || []).length) tdH.appendChild(httpChips(a, false)); else tdH.textContent = "—"; tr.appendChild(tdH);
     const tdS = el("td"); chips(tdS, a.sources); tr.appendChild(tdS);
     const tdV = el("td"); tdV.appendChild(el("span", "st " + (a.status || "none"), IOC_LABEL[a.status] || "—"));
+    if (a.status_override) {
+      const m = el("div", "muted manual", `set manually (was ${IOC_LABEL[a.status_override.computed] || "—"})`);
+      if (a.status_override.note) m.title = a.status_override.note;
+      tdV.appendChild(m);
+    }
     const dc = dnsCheckOf(a); if (dc && dc !== "ok") tdV.appendChild(el("div", "muted", DNS_LABEL[dc] || dc));
-    if (a.status === "false" && a.false_reasons && a.false_reasons.length) {
+    if (a.status === "false" && !a.status_override && a.false_reasons && a.false_reasons.length) {
       const fr = a.false_reasons[0];
       tdV.appendChild(el("div", "muted", (fr.hidden ? "hidden: " : "") + fr.reason));
     }
+    if ((a.enriched_by || []).length) { const t = el("div", "muted", "+ enrichment"); t.title = "found by a later enrichment: " + a.enriched_by.join(", "); tdV.appendChild(t); }
+    if (viaOf(a).length && !isThird(a)) { const t = el("div", "muted via", "via " + viaOf(a).join(", ")); t.title = "found through a related domain promoted into scope, not through the target itself"; tdV.appendChild(t); }
     if (isThird(a)) { const t = el("div", "muted", "third party"); t.title = "a provider from the target's DNS records: the relation is current, but it is not a target asset"; tdV.appendChild(t); }
     tr.appendChild(tdV);
-    const tdSeen = el("td", "seen", fmtSeen(a.seen)); tr.appendChild(tdSeen);
+    const tdSeen = el("td", "seen", fmtSeen(a.last_seen)); tr.appendChild(tdSeen);
     tr.className = "click"; tr.onclick = () => openAsset(a);
     body.appendChild(tr);
   }
   $("#r-count").textContent = `${rows.length} of ${ASSETS.length} findings`;
 }
+let SCAN_COMPANIES = {}, SCAN_COMPANY = "";
 function loadScan(name) {
+  SCAN_COMPANY = SCAN_COMPANIES[name] || "";
   $("#r-export").disabled = true;
   if (!name) { ASSETS = []; renderResults(); return; }
   $("#r-empty").textContent = "Loading…"; $("#r-empty").hidden = false; $("#r-body").innerHTML = "";
@@ -614,6 +1011,8 @@ function loadScan(name) {
     const types = new Set(), sources = new Set();
     ASSETS.forEach((a) => { types.add(a.type); a.sources.forEach((s) => sources.add(s)); });
     fillSelect($("#r-type"), [...types].sort());
+    addDomainOption($("#r-type"));
+    fillHttpFilter();
     fillSelect($("#r-source"), [...sources].sort());
     const cnt = {}; ASSETS.forEach((a) => { const k = a.status || "none"; cnt[k] = (cnt[k] || 0) + 1; });
     for (const o of $("#r-status").options) {
@@ -626,7 +1025,7 @@ function loadScan(name) {
   }).catch(() => { $("#r-empty").textContent = "Failed to load the scan."; });
 }
 $("#r-scan").onchange = () => loadScan($("#r-scan").value);
-["r-q", "r-type", "r-source", "r-status", "r-owner"].forEach((id) => { $("#" + id).oninput = renderResults; });
+["r-q", "r-port", "r-type", "r-source", "r-status", "r-http", "r-owner"].forEach((id) => { $("#" + id).oninput = renderResults; });
 document.querySelectorAll("#r-table th.sortable").forEach((th) => th.onclick = () => {
   const k = th.dataset.k; rSort.dir = (rSort.k === k) ? -rSort.dir : 1; rSort.k = k; renderResults();
 });
@@ -635,48 +1034,315 @@ function loadScanList(select) {
   return fetch("/api/scans").then((r) => r.json()).then((scans) => {
     const sel = $("#r-scan"), cur = select || sel.value;
     while (sel.options.length > 1) sel.remove(1);
+    SCAN_COMPANIES = {}; scans.forEach((s) => { SCAN_COMPANIES[s.name] = s.company || ""; });
     for (const s of scans) {
       const d = new Date(s.mtime * 1000).toISOString().slice(0, 10);
-      const o = el("option", null, `${s.name} · ${s.events} events · ${d}${s.company ? " · " + s.company : ""}${s.running ? " · running" : ""}`);
+      const o = el("option", null, `${s.enrich_of ? "↳ " : ""}${s.name} · ${s.events} events · ${d}${s.company ? " · " + s.company : ""}${s.enrich_of ? " · enrichment of " + s.enrich_of : ""}${s.running ? " · running" : ""}`);
       o.value = s.name; sel.appendChild(o);
     }
     if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
-    $("#r-report").disabled = !sel.value;
+    $("#r-report").disabled = $("#r-enrich").disabled = !sel.value;
     if (!scans.length && !ASSETS.length) $("#r-empty").textContent = "No scans in scans/. Start a new one.";
   }).catch(() => { $("#r-empty").textContent = "Failed to get the scan list."; });
 }
 loadScanList();
-$("#r-scan").addEventListener("change", () => { $("#r-report").disabled = !$("#r-scan").value; });
+$("#r-scan").addEventListener("change", () => { $("#r-report").disabled = $("#r-enrich").disabled = !$("#r-scan").value; });
+
+// ---------- enrichment of a finished scan ----------
+let enPlanTimer = null;
+const enPicked = () => [...document.querySelectorAll("#en-sources input:checked")].map((c) => c.value);
+function enPlan() {
+  clearTimeout(enPlanTimer);
+  const mods = enPicked(), scan = $("#r-scan").value;
+  $("#en-go").disabled = true; $("#en-err").textContent = "";
+  if (!mods.length) { $("#en-plan").textContent = "Pick the sources to see what will be sent."; return; }
+  $("#en-plan").textContent = "Counting seeds…";
+  enPlanTimer = setTimeout(() => {
+    fetch(`/api/enrich/${encodeURIComponent(scan)}?modules=${encodeURIComponent(mods.join(","))}`).then((r) => r.json()).then((p) => {
+      if (p.error) throw new Error(p.error);
+      const types = Object.entries(p.by_type).map(([t, n]) => `${t} ${n}`).join(", ") || "—";
+      const st = Object.entries(p.by_status).map(([t, n]) => `${t} ${n}`).join(", ");
+      const box = $("#en-plan"); box.innerHTML = "";
+      box.appendChild(el("div", null, `${p.seed_count} seeds: ${types}${st ? " (" + st + ")" : ""}${p.truncated ? ` · ${p.truncated} more not sent (limit)` : ""}`));
+      box.appendChild(el("div", "muted", `scope: ${p.targets.join(", ")}`));
+      box.appendChild(el("div", "muted", `the sources take: ${p.consumes.join(", ") || "—"}` + (p.parent !== scan ? ` · enriches the original scan ${p.parent}` : "")));
+      if (!p.seed_count) box.appendChild(el("div", "err", "Nothing to send: the scan has no findings of these types."));
+      $("#en-go").disabled = !p.seed_count;
+    }).catch((e) => { $("#en-plan").textContent = ""; $("#en-err").textContent = e.message; });
+  }, 250);
+}
+$("#r-enrich").onclick = () => {
+  const scan = $("#r-scan").value; if (!scan) return;
+  $("#en-scan").textContent = scan;
+  const grid = $("#en-sources"); grid.innerHTML = "";
+  SOURCES.forEach((s) => {
+    const lb = el("label"); const cb = el("input"); cb.type = "checkbox"; cb.value = s.name; cb.onchange = enPlan;
+    lb.title = `${s.description || ""}\ntakes: ${(s.watched_events || []).join(", ")}`;
+    lb.appendChild(cb); lb.appendChild(document.createTextNode(s.name)); grid.appendChild(lb);
+  });
+  $("#en-q").value = ""; enPlan();
+  $("#dlg-enrich").showModal();
+};
+$("#en-q").oninput = () => {
+  const q = $("#en-q").value.trim().toLowerCase();
+  document.querySelectorAll("#en-sources label").forEach((lb) => { lb.hidden = !!q && !lb.textContent.toLowerCase().includes(q); });
+};
+$("#en-x").onclick = $("#en-cancel").onclick = () => $("#dlg-enrich").close();
+$("#en-go").onclick = () => {
+  $("#en-go").disabled = true;
+  postJSON(`/api/enrich/${encodeURIComponent($("#r-scan").value)}`, { modules: enPicked() })
+    .then((job) => { $("#dlg-enrich").close(); renderJob(job); pollJobs(); })
+    .catch((e) => { $("#en-err").textContent = e.message; $("#en-go").disabled = false; });
+};
 
 // ---------- finding details ----------
 const DETAIL_LABEL = { description: "Description", severity: "Severity", confidence: "Confidence", url: "URL", host: "Host",
   path: "Path", name: "Name", platform: "Platform", profile_name: "Profile", technology: "Technology", asn: "ASN",
   country: "Country", city: "City", subnet: "Subnet" };
+// ---------- discovery chain ----------
+const DNS_RECORD_MODULE = /^[A-Z]+$/;  // "A", "MX", "CNAME"...: a record of live DNS resolution
+function chainBox(a) {
+  const box = el("div", "chainbox");
+  const btn = el("button", "btn sm", "Show discovery chain");
+  const out = el("div");
+  btn.onclick = () => {
+    if (btn.dataset.open) { out.innerHTML = ""; delete btn.dataset.open; btn.textContent = "Show discovery chain"; return; }
+    btn.disabled = true; out.innerHTML = ""; out.appendChild(el("div", "muted", "Loading…"));
+    const q = new URLSearchParams({ type: a.type, data: a.data });
+    fetch(`/api/chain/${encodeURIComponent($("#r-scan").value)}?${q}`).then((r) => r.json()).then((d) => {
+      if (d.error) throw new Error(d.error);
+      renderChainViews(out, d, a); btn.dataset.open = "1"; btn.textContent = "Hide discovery chain";
+    }).catch((e) => { out.innerHTML = ""; out.appendChild(el("div", "err", "Failed to build the chain: " + e.message)); })
+      .finally(() => { btn.disabled = false; });
+  };
+  box.appendChild(btn); box.appendChild(out);
+  return box;
+}
+function renderChainViews(out, d, a) {
+  out.innerHTML = "";
+  if (!d.chains.length) { out.appendChild(el("div", "muted", "No discovery path in this scan's output.")); return; }
+  const tabs = el("div", "seg"), body = el("div");
+  const views = { graph: () => renderChainGraph(body, d, a), list: () => renderChains(body, d, a) };
+  Object.entries({ graph: "Graph", list: "List" }).forEach(([k, label]) => {
+    const b = el("button", "btn sm", label); b.dataset.view = k;
+    b.onclick = () => { tabs.querySelectorAll("button").forEach((x) => x.classList.toggle("primary", x === b)); views[k](); };
+    tabs.appendChild(b);
+  });
+  out.appendChild(tabs); out.appendChild(body);
+  tabs.querySelector("button").click();
+}
+
+// layered graph: rows = distance from the scan target (BFS), order inside a row by the parents' positions
+const GW = 230, GH = 48, GX = 36, GY = 70, GPAD = 20;
+const STATUS_COLOR = { valid: "#2e9d5b", historical: "#c98a12", false: "#d64545" };
+function svgEl(tag, attrs, text) {
+  const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+  if (text != null) e.textContent = text;
+  return e;
+}
+function layoutGraph(g) {
+  const out = {}, inc = {};
+  g.nodes.forEach((n) => { out[n.id] = []; inc[n.id] = []; });
+  g.edges.forEach((e) => { out[e.from].push(e.to); inc[e.to].push(e.from); });
+  const layer = {}, queue = [];
+  g.nodes.filter((n) => n.seed || !inc[n.id].length).forEach((n) => { layer[n.id] = 0; queue.push(n.id); });
+  while (queue.length) {
+    const id = queue.shift();
+    out[id].forEach((to) => { if (layer[to] === undefined) { layer[to] = layer[id] + 1; queue.push(to); } });
+  }
+  g.nodes.forEach((n) => { if (layer[n.id] === undefined) layer[n.id] = 0; });
+  const rows = [];
+  g.nodes.forEach((n) => { (rows[layer[n.id]] = rows[layer[n.id]] || []).push(n.id); });
+  const pos = {};
+  const place = () => rows.forEach((r) => r.forEach((id, i) => { pos[id] = i; }));
+  place();
+  for (let pass = 0; pass < 3; pass++) {
+    rows.forEach((r, li) => {
+      if (!li) return;
+      const bary = (id) => { const ps = inc[id].filter((p) => layer[p] < li); return ps.length ? ps.reduce((s, p) => s + pos[p], 0) / ps.length : pos[id]; };
+      r.sort((x, y) => bary(x) - bary(y)); place();
+    });
+  }
+  // room on the right for the arcs of loops (an edge back to an earlier or the same row)
+  const backSpan = Math.max(0, ...g.edges.filter((e) => layer[e.to] <= layer[e.from]).map((e) => layer[e.from] - layer[e.to]));
+  const hasBack = g.edges.some((e) => layer[e.to] <= layer[e.from]);
+  const arcRoom = hasBack ? 60 + 20 * backSpan + 80 : 0;
+  const nodesW = Math.max(...rows.map((r) => r.length)) * (GW + GX) - GX;
+  const width = nodesW + 2 * GPAD + arcRoom;
+  const xy = {};
+  rows.forEach((r, li) => {
+    const rowW = r.length * (GW + GX) - GX, x0 = GPAD + (nodesW - rowW) / 2;
+    r.forEach((id, i) => { xy[id] = { x: x0 + i * (GW + GX), y: GPAD + li * (GH + GY), layer: li }; });
+  });
+  return { xy, width, height: GPAD * 2 + rows.length * (GH + GY) - GY };
+}
+function renderChainGraph(body, d, a) {
+  body.innerHTML = "";
+  const g = d.graph, { xy, width, height } = layoutGraph(g);
+  body.appendChild(el("div", "hint", `${g.nodes.length} findings, ${g.edges.length} relations from ${d.total} discovery path${d.total > 1 ? "s" : ""}` +
+    (d.total > d.chains.length ? ` (the ${d.chains.length} shortest)` : "") + ". Top: the scan target; an edge is \"found from\", labelled with the source. Click a block to open it."));
+  const wrap = el("div", "graphwrap");
+  const svg = svgEl("svg", { width, height, viewBox: `0 0 ${width} ${height}`, class: "chaingraph" });
+  const defs = svgEl("defs");
+  const marker = svgEl("marker", { id: "arrow", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" });
+  marker.appendChild(svgEl("path", { d: "M0,0 L10,5 L0,10 z", class: "arrowhead" }));
+  defs.appendChild(marker); svg.appendChild(defs);
+  const byId = {}; g.nodes.forEach((n) => { byId[n.id] = n; });
+  // edges first, under the blocks
+  g.edges.forEach((e) => {
+    const s = xy[e.from], t = xy[e.to];
+    const back = t.layer <= s.layer;
+    let path, lx, ly;
+    if (!back) {
+      const x1 = s.x + GW / 2, y1 = s.y + GH, x2 = t.x + GW / 2, y2 = t.y, my = (y1 + y2) / 2;
+      path = `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`; lx = (x1 + x2) / 2; ly = my;
+    } else {
+      // found again from a later finding (a loop): an arc on the right side
+      const x1 = s.x + GW, y1 = s.y + GH / 2, x2 = t.x + GW, y2 = t.y + GH / 2, bulge = 40 + 20 * (s.layer - t.layer);
+      path = `M${x1},${y1} C${x1 + bulge},${y1} ${x2 + bulge},${y2} ${x2},${y2}`; lx = Math.max(x1, x2) + bulge * 0.75; ly = (y1 + y2) / 2;
+    }
+    const p = svgEl("path", { d: path, class: "edge" + (back ? " back" : ""), "marker-end": "url(#arrow)" });
+    p.appendChild(svgEl("title", {}, (e.modules.join(", ") || "") + (e.context ? "\n" + e.context : "")));
+    svg.appendChild(p);
+    const label = e.modules.map((m) => m === "SEED" ? "target" : DNS_RECORD_MODULE.test(m) ? m + " record" : m).join(", ");
+    if (label) {
+      const t2 = svgEl("text", { x: lx, y: ly + 4, class: "edgelabel", "text-anchor": "middle" }, label.length > 34 ? label.slice(0, 33) + "…" : label);
+      svg.appendChild(t2);
+    }
+  });
+  g.nodes.forEach((n) => {
+    const { x, y } = xy[n.id];
+    const grp = svgEl("g", { class: "gnode" + (n.target ? " target" : "") + (n.in_output ? "" : " omitted"), transform: `translate(${x},${y})` });
+    grp.appendChild(svgEl("rect", { width: GW, height: GH, rx: 7, ry: 7, style: `stroke:${STATUS_COLOR[n.status] || "#8a94a3"}` }));
+    grp.appendChild(svgEl("rect", { width: 5, height: GH, rx: 2, style: `fill:${STATUS_COLOR[n.status] || "#8a94a3"};stroke:none` }));
+    const label = n.data == null ? "(not in the output)" : n.type === "TECHNOLOGY" ? techLabel(n.data) : n.data;
+    grp.appendChild(svgEl("text", { x: 14, y: 18, class: "gtype" }, n.type + (n.seed ? " · scan target" : "") + (n.status ? " · " + (IOC_LABEL[n.status] || n.status) : "")));
+    grp.appendChild(svgEl("text", { x: 14, y: 36, class: "gdata" }, label.length > 30 ? label.slice(0, 29) + "…" : label));
+    grp.appendChild(svgEl("title", {}, `${n.type}: ${n.data == null ? "not in the output" : n.data}` + (n.false_reason ? `\n${n.hidden ? "hidden" : "dropped"}: ${n.false_reason}` : "")));
+    const asset = n.data != null ? ASSETS.find((x) => x.type === n.type && x.data === n.data) : null;
+    if (asset && !n.target) { grp.classList.add("link"); grp.addEventListener("click", () => openAsset(asset)); }
+    svg.appendChild(grp);
+  });
+  wrap.appendChild(svg); body.appendChild(wrap);
+  const tgt = g.nodes.find((n) => n.target && n.false_reason);
+  if (tgt) body.appendChild(el("div", "err", `${tgt.hidden ? "Hidden" : "Dropped"} as false: ${tgt.false_reason}`));
+  const legend = el("div", "muted legend");
+  legend.textContent = "Border: valid green · historical amber · false red. Thick border: this finding. Dashed arc: found again from a later finding.";
+  body.appendChild(legend);
+}
+
+function renderChains(out, d, a) {
+  out.innerHTML = "";
+  if (!d.chains.length) { out.appendChild(el("div", "muted", "No discovery path in this scan's output.")); return; }
+  out.appendChild(el("div", "hint", d.total > d.chains.length
+    ? `${d.total} ways this finding was discovered, the ${d.chains.length} shortest are shown.`
+    : `${d.total} way${d.total > 1 ? "s" : ""} this finding was discovered: from the scan target to the finding.`));
+  d.chains.forEach((c, i) => {
+    const ch = el("div", "chain");
+    ch.appendChild(el("div", "chain-title", `Path ${i + 1} · ${c.steps.length} step${c.steps.length > 1 ? "s" : ""}`));
+    const ol = el("ol");
+    c.steps.forEach((st, j) => {
+      const li = el("li", st.in_output ? "" : "omitted");
+      const head = el("div", "step-head");
+      head.appendChild(el("span", "chip", st.type));
+      const last = j === c.steps.length - 1;
+      const target = st.data != null ? ASSETS.find((x) => x.type === st.type && x.data === st.data) : null;
+      const name = el(target && !last ? "a" : "b", null, st.data != null ? (st.type === "TECHNOLOGY" ? techLabel(st.data) : st.data) : "(not in the output)");
+      if (target && !last) { name.href = "#"; name.title = "open this finding"; name.onclick = (e) => { e.preventDefault(); openAsset(target); }; }
+      head.appendChild(name);
+      if (st.module) {
+        const via = st.module === "SEED" ? "scan target" : DNS_RECORD_MODULE.test(st.module) ? `${st.module} record (live DNS)` : st.module;
+        head.appendChild(el("span", "muted", " via " + via));
+      }
+      if (st.status) head.appendChild(el("span", "st " + st.status, IOC_LABEL[st.status] || st.status));
+      if (st.freshness && st.freshness !== "inherit") head.appendChild(el("span", "muted", " · source: " + st.freshness));
+      li.appendChild(head);
+      if (st.context) li.appendChild(el("div", "muted ctxline", st.context));
+      if (last && c.false_reason) li.appendChild(el("div", "err", (c.hidden ? "hidden: " : "dropped: ") + c.false_reason));
+      ol.appendChild(li);
+    });
+    ch.appendChild(ol); out.appendChild(ch);
+  });
+}
+
+// ---------- manual status ----------
+function statusForm(a) {
+  const box = el("div", "statusform");
+  box.appendChild(el("h3", null, "Change status"));
+  const o = a.status_override;
+  box.appendChild(el("div", "hint", o
+    ? `Set manually to ${IOC_LABEL[o.status]} on ${fmtSeen(o.at)} (computed: ${IOC_LABEL[o.computed] || "—"})${o.note ? " — " + o.note : ""}.`
+    : "The computed status is kept next to yours: every change is logged with the evidence to improve the validation rules." +
+      (SCAN_COMPANY ? ` Applies to all scans of ${SCAN_COMPANY} and its timeline.` : " Applies to this scan.")));
+  const row = el("div", "keyform");
+  const sel = el("select");
+  [["valid", "valid"], ["historical", "historical"], ["false", "false"]].forEach(([v, l]) => { const op = el("option", null, l); op.value = v; sel.appendChild(op); });
+  sel.value = a.status && a.status !== "none" ? a.status : "valid";
+  const note = el("input"); note.type = "text"; note.placeholder = "why (optional): e.g. a CDN address, not the target's"; note.maxLength = 1000;
+  note.style.flex = "1";
+  const save = el("button", "btn sm primary", "Save");
+  const revert = el("button", "btn sm", "Revert to computed"); revert.hidden = !o;
+  const msg = el("span", "err");
+  const send = (status) => {
+    save.disabled = revert.disabled = true; msg.textContent = "";
+    postJSON("/api/status/set", { scan: $("#r-scan").value, type: a.type, data: a.data, status, note: note.value.trim() })
+      .then(() => { $("#dlg").close(); loadScan($("#r-scan").value); })
+      .catch((e) => { msg.textContent = e.message; })
+      .finally(() => { save.disabled = revert.disabled = false; });
+  };
+  save.onclick = () => {
+    const cur = o ? o.status : a.status;
+    if (sel.value === cur && !note.value.trim()) { msg.textContent = "The status is already " + IOC_LABEL[cur] + "."; return; }
+    send(sel.value);
+  };
+  revert.onclick = () => send("");
+  row.appendChild(sel); row.appendChild(note); row.appendChild(save); row.appendChild(revert);
+  box.appendChild(row); box.appendChild(msg);
+  return box;
+}
+
 function openAsset(a) {
   $("#dlg-name").textContent = a.data.length > 80 ? a.data.slice(0, 80) + "…" : a.data;
   const b = $("#dlg-body"); b.innerHTML = "";
   const dl = el("dl");
   const row = (k, v) => { dl.appendChild(el("dt", null, k)); const d = el("dd"); if (v instanceof Node) d.appendChild(v); else d.textContent = v; dl.appendChild(d); };
   row("Type", a.type);
+  if ((a.http_status || []).length) row("HTTP status", httpChips(a));
   const st = el("span"); st.appendChild(el("span", "st " + (a.status || "none"), IOC_LABEL[a.status] || "untagged"));
+  if (a.status_override) st.appendChild(document.createTextNode(` set manually (computed: ${IOC_LABEL[a.status_override.computed] || "—"})`));
   const dc = dnsCheckOf(a); if (dc) st.appendChild(document.createTextNode(" DNS: " + (DNS_LABEL[dc] || dc)));
   if (isThird(a)) st.appendChild(document.createTextNode(" · third party"));
   row("Status", st);
+  if ((a.enriched_by || []).length) row("Found by enrichment", a.enriched_by.join(", "));
+  if (viaOf(a).length) row("Via related domain", viaOf(a).join(", ") + " (promoted into scope by related_domains)");
   if (a.false_reasons && a.false_reasons.length) {
     const d = el("div"); a.false_reasons.forEach((r) => { const c = el("div", "ctx"); c.appendChild(el("b", null, r.module || "—"));
       c.appendChild(document.createTextNode(": " + (r.hidden ? "hidden — " : "dropped — ") + r.reason)); d.appendChild(c); });
     row("Why false", d);
   }
-  for (const [k, v] of Object.entries(a.details || {})) row(DETAIL_LABEL[k] || k, v);
+  for (const [k, v] of Object.entries(a.details || {})) {
+    if (a.type === "TECHNOLOGY" && (k === "host" || k === "technology")) continue;
+    row(DETAIL_LABEL[k] || k, v);
+  }
+  if (a.type === "TECHNOLOGY") {
+    row("Technology", a.data);
+    const d = el("div");
+    (a.on || []).forEach((o) => d.appendChild(el("div", null, o.host + (o.ports.length ? " — ports " + o.ports.join(", ") : " — port unknown (the source gave none)"))));
+    row("Seen on", d);
+  } else if ((a.ports || []).length) row("Ports", a.ports.join(", "));
   { const d = el("div"); chips(d, a.sources); row("Sources", d); }
   if (a.contexts && a.contexts.length) {
     const d = el("div"); a.contexts.forEach((c) => { const x = el("div", "ctx"); x.appendChild(el("b", null, c.module || "—"));
       x.appendChild(document.createTextNode(": " + c.context)); d.appendChild(x); });
     row("How it was found", d);
   }
-  row("Last seen", fmtSeen(a.seen));
+  row("Last seen", a.last_seen ? fmtSeen(a.last_seen) + " (from the source)" : "— (no source gives a date)");
+  row("Scan date", fmtSeen(a.scan_date));
   { const d = el("div"); chips(d, a.tags || [], "flag"); row("Tags", d); }
   b.appendChild(dl);
+  b.appendChild(chainBox(a));
+  b.appendChild(statusForm(a));
   $("#dlg").showModal();
 }
 
@@ -731,13 +1397,14 @@ const postJSON = (url, body) => fetch(url, { method: "POST", headers: { "Content
   .then((r) => r.json().then((d) => { if (!r.ok) throw new Error(d.error || r.statusText); return d; }));
 function renderPickCount() {
   const n = document.querySelectorAll("#scan-sources input:checked").length;
-  $("#scan-pick-count").textContent = `selected: ${n}`;
+  $("#scan-pick-count").textContent = `selected: ${n} of ${document.querySelectorAll("#scan-sources input").length}`;
 }
 $("#r-new").onclick = () => {
   const grid = $("#scan-sources");
   if (!grid.children.length) {
     SOURCES.forEach((s) => {
       const lb = el("label"); const cb = el("input"); cb.type = "checkbox"; cb.value = s.name; cb.onchange = renderPickCount;
+      cb.dataset.passive = (s.flags || []).includes("passive") ? "1" : "";
       lb.title = s.description || ""; lb.appendChild(cb); lb.appendChild(document.createTextNode(s.name)); grid.appendChild(lb);
     });
   }
@@ -754,11 +1421,21 @@ $("#scan-company").onchange = () => {
   const c = COMPANIES.find((x) => String(x.id) === $("#scan-company").value);
   if (c) $("#scan-targets").value = c.targets.join("\n");
 };
-$("#scan-mode").onchange = () => { $("#scan-pick").hidden = $("#scan-mode").value !== "pick"; };
+// "all" = the passive set (-f passive): active sources (http contacts the target) stay unchecked
+const checkAllSources = (on) => { document.querySelectorAll("#scan-sources input").forEach((c) => { c.checked = on && !!c.dataset.passive; }); renderPickCount(); };
+$("#scan-mode").onchange = () => {
+  const mode = $("#scan-mode").value;
+  $("#scan-pick").hidden = mode === "all";
+  // custom starts from the full set (uncheck what you do not need), pick starts empty
+  if (mode !== "all") checkAllSources(mode === "custom");
+};
+$("#scan-check-all").onclick = (e) => { e.preventDefault(); checkAllSources(true); };
+$("#scan-check-none").onclick = (e) => { e.preventDefault(); checkAllSources(false); };
 $("#scan-x").onclick = $("#scan-cancel").onclick = () => $("#dlg-scan").close();
 $("#scan-go").onclick = () => {
-  const modules = $("#scan-mode").value === "pick" ? [...document.querySelectorAll("#scan-sources input:checked")].map((c) => c.value) : [];
-  if ($("#scan-mode").value === "pick" && !modules.length) { $("#scan-err").textContent = "Pick at least one source."; return; }
+  const picking = $("#scan-mode").value !== "all";
+  const modules = picking ? [...document.querySelectorAll("#scan-sources input:checked")].map((c) => c.value) : [];
+  if (picking && !modules.length) { $("#scan-err").textContent = "Pick at least one source."; return; }
   $("#scan-go").disabled = true; $("#scan-err").textContent = "";
   postJSON("/api/scans/start", { targets: $("#scan-targets").value, name: $("#scan-name").value.trim(), modules,
     company_id: $("#scan-company").value ? Number($("#scan-company").value) : null })
@@ -801,7 +1478,7 @@ function pollJobs() {
 }
 $("#job-stop").onclick = () => { if (JOB) postJSON(`/api/jobs/${encodeURIComponent(JOB.name)}/stop`).then(renderJob).catch((e) => alert(e.message)); };
 $("#job-hide").onclick = () => { if (JOB) { jobHidden = JOB.name; renderJob(JOB); } };
-$("#job-open").onclick = () => { if (!JOB) return; const n = JOB.name; loadScanList(n).then(() => { $("#r-scan").value = n; $("#r-report").disabled = false; loadScan(n); }); };
+$("#job-open").onclick = () => { if (!JOB) return; const n = (JOB.meta && JOB.meta.enrich_of) || JOB.name; loadScanList(n).then(() => { $("#r-scan").value = n; $("#r-report").disabled = false; loadScan(n); }); };
 pollJobs();
 
 // ---------- source report ----------
@@ -814,6 +1491,37 @@ const typeChips = (td, obj) => {
   if (!ent.length) { td.appendChild(el("span", "muted", "—")); return; }
   ent.forEach(([k, v]) => { const c = el("span", "chip", k); c.appendChild(el("b", null, String(v))); td.appendChild(c); });
 };
+const PERIOD = { hour: "/h", day: "/day", month: "/mo" };
+const fmtN = (n) => n == null ? "?" : (Number.isInteger(n) ? n.toLocaleString("en") : String(Math.round(n * 100) / 100));
+// account counters (before/after the scan, or the current state), else the documented free limit
+function quotaCell(td, s) {
+  const q = s.quota || {};
+  let counters = q.counters, now = false;
+  if ((!counters || !counters.length) && QUOTA_NOW && QUOTA_ACCOUNT[s.name] && QUOTA_NOW[QUOTA_ACCOUNT[s.name]]) {
+    const acc = QUOTA_NOW[QUOTA_ACCOUNT[s.name]];
+    if (acc.error) { td.appendChild(el("span", "muted", "account: " + acc.error)); return; }
+    counters = acc.counters; now = true;
+  }
+  if (q.account_error) { td.appendChild(el("span", "muted", "account: " + q.account_error)); return; }
+  if (counters && counters.length) {
+    counters.forEach((c) => {
+      const spent = c.spent != null ? `spent ${fmtN(c.spent)} · ` : "";
+      const left = c.limit != null ? `${fmtN(c.remaining)} of ${fmtN(c.limit)}${PERIOD[c.period] || ""}` : `${fmtN(c.remaining)} left`;
+      td.appendChild(el("div", null, `${c.name}: ${spent}${left}`));
+    });
+    td.appendChild(el("div", "muted", now ? "current account state (no snapshot for this scan)" : (counters[0].snapshot === "after" ? "account, after the scan" : "account, before the scan")));
+    return;
+  }
+  const f = q.free_limit;
+  if (f) {
+    td.appendChild(el("div", null, `limit ${fmtN(f.limit)}${PERIOD[f.period] || ""} per ${f.per}`));
+    td.appendChild(el("div", "muted", `≈${fmtN(f.remaining_estimate)} left (${fmtN(f.used_in_window)} requests by scans in the window)`));
+    return;
+  }
+  td.appendChild(el("span", "muted", "—"));
+}
+// /api/quota: current account state and which account each module uses
+let QUOTA_NOW = null, QUOTA_ACCOUNT = {};
 function renderReport() {
   const r = REPORT, b = $("#rep-body"); b.innerHTML = "";
   const meta = el("div", "rep-meta");
@@ -834,7 +1542,25 @@ function renderReport() {
   kpi(r.by_status.historical || 0, "historical");
   kpi(r.third_party || 0, "third-party infrastructure");
   kpi(r.false || 0, "dropped as false");
+  kpi(r.problem_sources || 0, "sources with problems");
   b.appendChild(k);
+
+  // sources that failed during the scan: unavailable, rate limited, out of quota, key refused, did not start
+  const bad = r.sources.filter((s) => s.problems && s.problems.length);
+  if (bad.length) {
+    const pb = el("div", "problems");
+    pb.appendChild(el("h3", null, "Problems during the scan"));
+    bad.forEach((s) => s.problems.forEach((pr) => {
+      const line = el("div", "ctx");
+      line.appendChild(el("b", null, s.name));
+      line.appendChild(document.createTextNode(`: ${pr.label}${pr.count ? ` — ${pr.count} request${pr.count > 1 ? "s" : ""}` : ""}`));
+      if (pr.sample) line.appendChild(el("div", "muted", pr.sample.length > 200 ? pr.sample.slice(0, 200) + "…" : pr.sample));
+      pb.appendChild(line);
+    }));
+    b.appendChild(pb);
+  } else if (!r.has_module_stats) {
+    b.appendChild(el("div", "muted", "This scan has no request statistics (scanned before request counting): failed requests are not known, only modules that did not start or stopped."));
+  }
 
   const types = el("div"); types.style.marginBottom = "10px"; typeChips(types, r.by_type); b.appendChild(types);
   const dnsEnt = Object.entries(r.dns_check || {});
@@ -847,14 +1573,15 @@ function renderReport() {
 
   const wrap = el("div", "tablewrap"); const t = el("table"); const th = el("thead"); const hr = el("tr");
   const cols = [["name", "Source"], ["state", "State"], ["assets", "Findings", "num"], ["only", "Only here", "num"],
-    [null, "What data"], ["valid", "Valid", "num"], ["historical", "Hist.", "num"], ["false", "False", "num"]];
+    [null, "What data"], ["valid", "Valid", "num"], ["historical", "Hist.", "num"], ["false", "False", "num"],
+    ["requests", "Requests", "num"], [null, "Quota: spent · left"]];
   cols.forEach(([key, label, cls]) => {
     const h = el("th", (key ? "sortable " : "") + (cls || ""), label + (repSort.k === key ? (repSort.dir > 0 ? " ↑" : " ↓") : ""));
     if (key) h.onclick = () => { repSort.dir = repSort.k === key ? -repSort.dir : (key === "name" || key === "state" ? 1 : -1); repSort.k = key; renderReport(); };
     hr.appendChild(h);
   });
   th.appendChild(hr); t.appendChild(th);
-  const val = (s, key) => key === "valid" || key === "historical" ? (s.status[key] || 0) : s[key];
+  const val = (s, key) => key === "valid" || key === "historical" ? (s.status[key] || 0) : key === "requests" ? (s.quota.requests || 0) : s[key];
   const rows = [...r.sources].sort((a, c) => {
     const x = val(a, repSort.k), y = val(c, repSort.k);
     return ((x < y ? -1 : x > y ? 1 : 0) * repSort.dir) || (c.assets - a.assets) || a.name.localeCompare(c.name);
@@ -873,6 +1600,13 @@ function renderReport() {
     tr.appendChild(el("td", "num", String(s.status.valid || 0)));
     tr.appendChild(el("td", "num", String(s.status.historical || 0)));
     tr.appendChild(el("td", "num", String(s.false || 0)));
+    const q = s.quota || {};
+    const tdR = el("td", "num", q.requests == null ? "—" : String(q.requests));
+    const failedReq = Object.entries(q.outcomes || {}).filter(([k]) => k !== "ok").reduce((n, [, v]) => n + v, 0);
+    if (failedReq) tdR.appendChild(el("div", "muted", `${failedReq} failed`));
+    tr.appendChild(tdR);
+    const tdQ = el("td", "quota"); quotaCell(tdQ, s); tr.appendChild(tdQ);
+    if (s.problems && s.problems.length) tr.className = "problem";
     tb.appendChild(tr);
   }
   t.appendChild(tb); wrap.appendChild(t); b.appendChild(wrap);
@@ -888,6 +1622,12 @@ $("#r-report").onclick = () => {
   fetch("/api/report/" + encodeURIComponent(name)).then((r) => r.json()).then((d) => {
     if (d.error) throw new Error(d.error);
     REPORT = d; renderReport();
+    // current account quota for scans without before/after snapshots (started from the CLI or before counting)
+    if (!QUOTA_NOW && d.sources.some((s) => !(s.quota && s.quota.counters && s.quota.counters.length)))
+      fetch("/api/quota").then((r) => r.json()).then((qn) => {
+        QUOTA_NOW = qn.accounts || {}; QUOTA_ACCOUNT = qn.modules || {};
+        if (REPORT === d) renderReport();
+      }).catch(() => {});
   }).catch((e) => { $("#rep-body").innerHTML = ""; $("#rep-body").appendChild(el("div", "empty", "Failed to build the report: " + e.message)); });
 };
 $("#rep-x").onclick = () => $("#dlg-report").close();
@@ -1133,13 +1873,13 @@ $("#tg-test").onclick = () => { $("#tg-msg").textContent = "sending…";
 // ---------- export ----------
 const expFilter = () => {
   const type = $("#exp-type").value, src = $("#exp-source").value, st = $("#exp-status").value;
-  return ASSETS.filter((a) => (!type || a.type === type) && (!src || a.sources.includes(src)) && (!st || (a.status || "none") === st));
+  return ASSETS.filter((a) => typeMatch(a, type) && (!src || a.sources.includes(src)) && (!st || (a.status || "none") === st));
 };
 const expCount = () => { const n = expFilter().length; $("#exp-count").textContent = `${n} of ${ASSETS.length} findings will be exported`; $("#exp-go").disabled = !n; };
 $("#r-export").onclick = () => {
   const types = [...new Set(ASSETS.map((a) => a.type))].sort();
   const sources = [...new Set(ASSETS.flatMap((a) => a.sources))].sort();
-  fillSelect($("#exp-type"), types); fillSelect($("#exp-source"), sources);
+  fillSelect($("#exp-type"), types); addDomainOption($("#exp-type")); fillSelect($("#exp-source"), sources);
   // start from the current table filters
   $("#exp-type").value = $("#r-type").value; $("#exp-source").value = $("#r-source").value; $("#exp-status").value = $("#r-status").value;
   $("#exp-err").textContent = ""; expCount();
@@ -1155,12 +1895,16 @@ const EXPORT_COLUMNS = [
   ["finding", (a) => a.data],
   ["status", (a) => a.status || "untagged"],
   ["third_party", (a) => isThird(a) ? "yes" : ""],
+  ["http_status", (a) => (a.http_status || []).join(" ")],
+  ["via_related", (a) => viaOf(a).join(" ")],
+  ["enriched_by", (a) => (a.enriched_by || []).join(" ")],
   ["dns_check", (a) => dnsCheckOf(a) || ""],
   // only for false findings: a valid finding may also have been dropped on other discovery paths (kept in JSON)
   ["false_reason", (a) => a.status === "false" ? (a.false_reasons || []).map((r) => `${r.module}: ${r.reason}`).join(" | ") : ""],
   ["sources", (a) => a.sources.join(";")],
   ["source_count", (a) => a.sources.length],
-  ["last_seen", (a) => isoSeen(a.seen)],
+  ["last_seen", (a) => isoSeen(a.last_seen)],
+  ["scan_date", (a) => isoSeen(a.scan_date)],
   ["description", (a) => (a.details || {}).description || ""],
   ["severity", (a) => (a.details || {}).severity || ""],
   ["tags", (a) => (a.tags || []).join(";")],
@@ -1173,14 +1917,14 @@ function download(name, mime, text) {
 }
 $("#exp-go").onclick = () => {
   const rows = expFilter(), fmt = $("#exp-format").value, scan = $("#r-scan").value || "scan";
-  const parts = [scan, $("#exp-type").value || "all", $("#exp-source").value, $("#exp-status").value].filter(Boolean);
+  const parts = [scan, ($("#exp-type").value === DOMAIN_TYPE ? "domains" : $("#exp-type").value) || "all", $("#exp-source").value, $("#exp-status").value].filter(Boolean);
   const base = parts.join("_").replace(/[^a-zA-Z0-9_.-]+/g, "-");
   if (fmt === "json") {
-    const records = rows.map((a) => ({ type: a.type, finding: a.data, status: a.status || "untagged", third_party: isThird(a),
-      dns_check: dnsCheckOf(a), sources: a.sources, last_seen: isoSeen(a.seen) || null, details: a.details || {},
+    const records = rows.map((a) => ({ type: a.type, finding: a.data, status: a.status || "untagged", third_party: isThird(a), via_related: viaOf(a),
+      dns_check: dnsCheckOf(a), sources: a.sources, last_seen: isoSeen(a.last_seen) || null, scan_date: isoSeen(a.scan_date) || null, details: a.details || {},
       discovery: a.contexts || [], false_reasons: a.false_reasons || [], tags: a.tags || [] }));
     const doc = { scan, exported_at: new Date().toISOString(),
-      filters: { type: $("#exp-type").value || null, source: $("#exp-source").value || null, status: $("#exp-status").value || null },
+      filters: { type: ($("#exp-type").value === DOMAIN_TYPE ? "domains (2nd level)" : $("#exp-type").value) || null, source: $("#exp-source").value || null, status: $("#exp-status").value || null },
       count: records.length, findings: records };
     download(base + ".json", "application/json", JSON.stringify(doc, null, 2));
   } else {

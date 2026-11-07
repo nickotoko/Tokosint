@@ -392,6 +392,7 @@ class BBOTConfig(BaseModel):
     unarchive: Optional[bool] = None
     python: Optional[bool] = None
     validity: Optional[bool] = None
+    ipowner: Optional[bool] = None
 
     # URL handling
     url_querystring_remove: Optional[bool] = None

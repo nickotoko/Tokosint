@@ -55,7 +55,7 @@ class shodan_idb(BaseModule):
     class Config(BaseModuleConfig):
         api_key: str | list[str] = Field(
             "",
-            description="Shodan API key (optional, falls back to the shodan_dns key). With a key, the full host API is used instead of InternetDB (no query credits)",
+            description="Shodan API key (optional, falls back to the shodan_dns key). With a key, the full host API is used instead of InternetDB (observed 2026-11-06 on the dev plan: it spends query credits, ~1 per IP)",
             sensitive=True,
         )
         history: bool = Field(
@@ -167,12 +167,14 @@ class shodan_idb(BaseModule):
         Converts a /shodan/host/{ip} response into the InternetDB format, plus the first/last
         observation date of every TCP port (from banner timestamps)
         """
-        cpes, port_dates = [], {}
+        cpes, cpe_ports, port_dates = [], {}, {}
         for banner in data.get("data", []):
+            port, timestamp = banner.get("port"), (banner.get("timestamp") or "")[:10]
             for cpe in banner.get("cpe23") or banner.get("cpe") or []:
                 if cpe not in cpes:
                     cpes.append(cpe)
-            port, timestamp = banner.get("port"), (banner.get("timestamp") or "")[:10]
+                if port and banner.get("transport", "tcp") == "tcp":
+                    cpe_ports.setdefault(cpe, set()).add(port)
             if port and banner.get("transport", "tcp") == "tcp" and timestamp:
                 first, last = port_dates.get(port, (timestamp, timestamp))
                 port_dates[port] = (min(first, timestamp), max(last, timestamp))
@@ -181,6 +183,8 @@ class shodan_idb(BaseModule):
             vulns = list(vulns)
         normalized = {
             "cpes": cpes,
+            # host API only: the ports each technology was seen on (InternetDB has no per-port mapping)
+            "cpe_ports": {cpe: sorted(ports) for cpe, ports in cpe_ports.items()},
             "hostnames": data.get("hostnames", []),
             "ip": data.get("ip_str", ""),
             "ports": sorted(set(data.get("ports", [])) | set(port_dates)),
@@ -203,22 +207,33 @@ class shodan_idb(BaseModule):
                     parent=event,
                     context=f'{{module}} queried {source} for "{query_host}" and found {{event.type}}: {{event.pretty_string}}',
                 )
+        cpe_ports = data.get("cpe_ports") or {}
+        port_dates = port_dates or {}
         for cpe in data.get("cpes", []):
-            await self.emit_event(
-                {"technology": cpe, "host": str(event.host)},
-                "TECHNOLOGY",
-                parent=event,
-                context=f'{{module}} queried {source} for "{query_host}" and found {{event.type}}: {{event.pretty_string}}',
-            )
+            for port in cpe_ports.get(cpe) or [None]:
+                tech = {"technology": cpe, "host": str(event.host)}
+                if port:
+                    tech["port"] = port
+                on_port = f" on port {port}" if port else ""
+                await self.emit_event(
+                    tech,
+                    "TECHNOLOGY",
+                    parent=event,
+                    # the date Shodan last saw the banner the technology came from (host API only)
+                    last_seen=port_dates.get(port, (None, None))[1] if port else None,
+                    context=f'{{module}} queried {source} for "{query_host}" and found {{event.type}}: {{event.pretty_string}}{on_port}',
+                )
         for port in data.get("ports", []):
             observed = ""
-            if port_dates and port in port_dates:
+            last = None
+            if port in port_dates:
                 first, last = port_dates[port]
                 observed = f" (observed {first})" if first == last else f" (observed {first} .. {last})"
             await self.emit_event(
                 self.helpers.make_netloc(event.data, port),
                 "OPEN_TCP_PORT",
                 parent=event,
+                last_seen=last,
                 context=f'{{module}} queried {source} for "{query_host}" and found {{event.type}}: {{event.pretty_string}}{observed}',
             )
         vulns = list(dict.fromkeys(data.get("vulns", [])))

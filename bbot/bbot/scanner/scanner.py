@@ -4,6 +4,7 @@ import asyncio
 import logging
 import traceback
 import contextlib
+import json
 import regex as re
 from pathlib import Path
 from sys import exc_info
@@ -1030,6 +1031,7 @@ class Scanner:
         # clean up self
         if not self._cleanedup:
             self._cleanedup = True
+            self._write_module_stats()
             # clean up modules
             for mod in self.modules.values():
                 await mod._cleanup()
@@ -1046,6 +1048,15 @@ class Scanner:
             if temp_dir is not None:
                 self.helpers.rm_rf(temp_dir, ignore_errors=True)
             self.helpers.clean_old_scans()
+
+    def _write_module_stats(self):
+        """module_stats.json in the scan folder: API requests per module and their outcomes (ok, rate_limit,
+        quota, auth, unavailable...), produced/consumed events. Only when the scan has an output folder."""
+        home = getattr(self, "home", None)
+        if home is None or not Path(home).is_dir() or not any(Path(home).iterdir()):
+            return
+        with contextlib.suppress(Exception):
+            (Path(home) / "module_stats.json").write_text(json.dumps(self.stats.as_dict(), indent=1))
 
     def in_scope(self, *args, **kwargs):
         return self.preset.in_scope(*args, **kwargs)

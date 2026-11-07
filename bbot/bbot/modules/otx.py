@@ -1,3 +1,4 @@
+from bbot.core.event.base import parse_last_seen
 from bbot.modules.templates.subdomain_enum import subdomain_enum_apikey
 from bbot.core.config.models import BaseModuleConfig, Field
 
@@ -27,11 +28,14 @@ class otx(subdomain_enum_apikey):
         return self.api_request(url)
 
     async def parse_results(self, r, query):
-        results = set()
+        # {hostname: the latest "last" date of its passive DNS records}
+        results = {}
         j = r.json()
         if isinstance(j, dict):
             for entry in j.get("passive_dns", []):
                 subdomain = entry.get("hostname", "")
                 if subdomain:
-                    results.add(subdomain)
+                    seen = parse_last_seen(entry.get("last"))
+                    prev = results.get(subdomain)
+                    results[subdomain] = seen if prev is None or (seen is not None and seen > prev) else prev
         return results

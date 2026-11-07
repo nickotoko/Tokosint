@@ -1,3 +1,4 @@
+from bbot.core.event.base import parse_last_seen
 from bbot.modules.templates.subdomain_enum import subdomain_enum_apikey
 from bbot.core.config.models import BaseModuleConfig, Field
 
@@ -31,11 +32,12 @@ class leakix(subdomain_enum_apikey):
         return response
 
     async def parse_results(self, r, query=None):
-        results = set()
+        # {subdomain: when LeakIX last saw it}
+        results = {}
         json = r.json()
         if isinstance(json, list):
             for entry in json:
                 subdomain = entry.get("subdomain", "")
                 if subdomain:
-                    results.add(subdomain)
+                    results[subdomain] = parse_last_seen(entry.get("last_seen"))
         return results

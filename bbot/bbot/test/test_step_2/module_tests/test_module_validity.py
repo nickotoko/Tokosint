@@ -157,6 +157,11 @@ class TestValidity_RelationsAndJunk(ModuleTestBase):
                 if event.data != BLS:
                     return
                 await self.emit_event("cdn.othercorp.io", "DNS_NAME", parent=event, context="link {event.data}")
+                # a search module reporting ports directly (not through the name): a foreign host and the target
+                for netloc in ("shop.othercorp.io:443", f"api.{BLS}:8443"):
+                    await self.emit_event(netloc, "OPEN_TCP_PORT", parent=event, context="port {event.data}")
+                # BBoT's placeholder of a wildcard domain
+                await self.emit_event(f"_wildcard.{BLS}", "DNS_NAME", parent=event, context="wildcard {event.data}")
                 for email in ("hand@3x.png", "user@gmail.com", "email@email.com", "info@othercorp.io"):
                     await self.emit_event(email, "EMAIL_ADDRESS", parent=event, context="email {event.data}")
 
@@ -186,6 +191,13 @@ class TestValidity_RelationsAndJunk(ModuleTestBase):
         assert records["hand@3x.png"]["hidden"] is False and "no public suffix" in records["hand@3x.png"]["reason"]
         assert "placeholder" in records["user@gmail.com"]["reason"]
         assert "placeholder" in records["email@email.com"]["reason"]
+        # a port on a foreign host from a search is false; a port on a target name is kept
+        assert "shop.othercorp.io:443" not in data
+        assert "out-of-scope host" in records["shop.othercorp.io:443"]["reason"]
+        assert f"api.{BLS}:8443" in data
+        # the wildcard placeholder is not a host
+        assert f"_wildcard.{BLS}" not in data
+        assert "wildcard placeholder" in records[f"_wildcard.{BLS}"]["reason"]
         # the hidden candidate is visible to modules (related_domains), but its descendants do not recurse
         assert "127.0.0.8" not in records or records["127.0.0.8"]["hidden"] is False
 
@@ -234,3 +246,36 @@ class TestValidity_HTTP(ModuleTestBase):
         assert {"validity-valid", "freshness-verified", "status-200"} <= live.tags
         removed = urls[f"{HTTPSERVER_URL}/removed"]
         assert {"validity-historical", "status-410"} <= removed.tags
+
+
+def _seed_status_file():
+    import tempfile
+
+    fh = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+    json.dump({f"old.{BLS}": "historical", BLS: "valid"}, fh)
+    fh.close()
+    return fh.name
+
+
+class TestValidity_SeedStatus(ModuleTestBase):
+    """A scan enriching an earlier one: seeds keep the status they had there, and their descendants follow it."""
+
+    module_name = "validity"
+    modules_overrides = []
+    targets = [BLS, f"old.{BLS}"]
+    config_overrides = {
+        "dns": {"minimal": False},
+        "scope": {"report_distance": 1},
+        "modules": {"validity": {"seed_status_file": _seed_status_file()}},
+    }
+
+    async def setup_after_prep(self, module_test):
+        await module_test.mock_dns({BLS: {"A": ["127.0.0.1"]}, f"old.{BLS}": {"A": ["127.0.0.3"]}})
+
+    def check(self, module_test, events):
+        old = TestValidity.find(events, "DNS_NAME", f"old.{BLS}")
+        assert {"seed", "validity-historical", "freshness-historical"} <= old.tags, old.tags
+        seed = TestValidity.find(events, "DNS_NAME", BLS)
+        assert "validity-valid" in seed.tags
+        # the live A record of a historical seed: current source, historical parent
+        assert "validity-historical" in TestValidity.find(events, "IP_ADDRESS", "127.0.0.3").tags

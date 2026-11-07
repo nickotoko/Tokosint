@@ -140,8 +140,11 @@ class censys_ip(censys):
             for software in service.get("software", []) or []:
                 product = software.get("cpe") or software.get("product", "")
                 if product:
+                    tech = {"technology": product, "host": ip}
+                    if port:
+                        tech["port"] = port
                     await self.emit_event(
-                        {"technology": product, "host": ip},
+                        tech,
                         "TECHNOLOGY",
                         parent=event,
                         context="{module} found {event.type}: {event.data[technology]} on {event.parent.data}",

@@ -1,0 +1,33 @@
+{
+  "_comment": "Documented free limits of sources without an account endpoint (see quotas.json for the notes). limit = requests per period; per = what the limit is counted against. Sources with an account endpoint (web/quota.py PROBES) are not listed: their real remaining quota is used.",
+  "crtname": {
+    "limit": 100,
+    "period": "day",
+    "per": "IP"
+  },
+  "hackertarget": {
+    "limit": 20,
+    "period": "day",
+    "per": "IP"
+  },
+  "ip2location": {
+    "limit": 1000,
+    "period": "day",
+    "per": "IP (no key)"
+  },
+  "certspotter": {
+    "limit": 10,
+    "period": "hour",
+    "per": "IP (no key)"
+  },
+  "netlas": {
+    "limit": 50,
+    "period": "day",
+    "per": "key (Community)"
+  },
+  "github_org": {
+    "limit": 60,
+    "period": "hour",
+    "per": "IP (no token)"
+  }
+}

@@ -26,6 +26,11 @@ VERDICT_FALSE, VERDICT_HISTORICAL, VERDICT_VERIFIED = "false", "historical", "ve
 VERDICT_UNRELATED = "unrelated"
 
 DNS_NAME_TYPES = ("DNS_NAME", "DNS_NAME_UNRESOLVED")
+# Findings on a host (host:port, URL, product on a port): an out-of-scope host name needs the same proven relation
+# as the name itself, unless the finding hangs off that name (then the name was checked).
+HOST_FINDING_TYPES = ("OPEN_TCP_PORT", "URL", "TECHNOLOGY")
+# BBoT's placeholder for collapsed wildcard names: "every name under the domain resolves", not a host
+WILDCARD_PLACEHOLDER = "_wildcard."
 # Live HTTP answer (status-NNN tag on a URL): the resource answers now, except "no such resource".
 HTTP_GONE = (404, 410)
 PROMOTE_POLICIES = ("in_scope", "none")
@@ -42,6 +47,8 @@ PLACEHOLDER_LOCALS = {
 OWNER_UNVERIFIED_TAG = "owner-unverified"
 # A third-party resource the target uses (a provider from its DNS records): the relation is valid, but not a target asset.
 THIRD_PARTY_TAG = "third-party"
+# ipowner: the address is the front of someone else's service -> third-party (see bbot/modules/internal/ipowner.py)
+IP_PROXY_TAG = "ip-proxy"
 
 
 class validity(BaseInterceptModule):
@@ -80,15 +87,19 @@ class validity(BaseInterceptModule):
       prove nothing -> verdict unrelated: status false, but the event is hidden (internal) instead of dropped -
       it never reaches the output, yet relation analysers (related_domains resolves candidates itself) see it
       and may promote the domain. Descendants of a hidden name are ordinary false findings (dropped), no recursion.
+      The same applies to a port / URL / technology on an out-of-scope host name that a search module reports
+      directly (not through the name): `foo.other.example:443` from a search for target.example is false.
 
-    Tag `third-party`: an out-of-scope name from a target DNS record (MX/NS/CNAME... to a provider) and its
+    Tag `third-party`: an out-of-scope name from a target DNS record (MX/NS/CNAME... to a provider), an IP address
+    tagged `ip-proxy` by ipowner (reached through a CNAME to a provider, an anti-DDoS/CDN network) and their
     out-of-scope descendants - the relation is valid ("the target uses it"), but it is third-party
     infrastructure, not a target asset.
 
     Junk check (`junk_check`) - false (except names from DNS records): names/emails without a public suffix
     (`hand@3x.png`, `*.test`, `*.local`), reserved domains (example.com), placeholder emails on foreign domains
     (user@..., email@...), events tagged `owner-unverified` by the source module (a profile found by a name match
-    whose ownership could not be verified).
+    whose ownership could not be verified); BBoT's wildcard placeholder `_wildcard.<domain>` and anything on it
+    (a wildcard means every name resolves - it is not a host of the target).
 
     False findings are dropped (`drop_false`), unrelated ones are hidden; both are logged to `validity_false.jsonl`.
 
@@ -130,6 +141,11 @@ class validity(BaseInterceptModule):
         http_check: bool = Field(
             True, description="Check URLs by the live HTTP status: 404/410 -> historical, any other answer -> verified"
         )
+        seed_status_file: str = Field(
+            "",
+            description="JSON {seed data: valid|historical} - the status seeds already have (a scan that enriches an "
+            "earlier one is seeded with its findings: a historical finding stays historical)",
+        )
         promote_resolved: str = Field(
             "in_scope",
             description="Which resolving names and answering URLs are verified as valid regardless of the discovery "
@@ -137,11 +153,19 @@ class validity(BaseInterceptModule):
         )
 
     scope_distance_modifier = None
-    # after dnsresolve (1) and cloudcheck (3): the checks need DNS records and cloud tags
+    # after dnsresolve (1), cloudcheck and ipowner (3): the checks need DNS records, cloud and ownership tags
     _priority = 4
 
     async def setup(self):
         self.drop_false = self.config.get("drop_false", True)
+        self.seed_status = {}
+        seed_status_file = self.config.get("seed_status_file", "")
+        if seed_status_file:
+            try:
+                with open(seed_status_file, encoding="utf-8") as fh:
+                    self.seed_status = {str(k): str(v) for k, v in json.load(fh).items()}
+            except (OSError, ValueError) as e:
+                return False, f"cannot read seed_status_file {seed_status_file}: {e}"
         self.promote_resolved = self.config.get("promote_resolved", "in_scope")
         if self.promote_resolved not in PROMOTE_POLICIES:
             return False, f"promote_resolved must be one of {PROMOTE_POLICIES}, got {self.promote_resolved!r}"
@@ -165,6 +189,11 @@ class validity(BaseInterceptModule):
 
     def source_freshness(self, event):
         """The event's own freshness: VALID / HISTORICAL / None (inherits the parent)."""
+        # a seed taken from an earlier scan keeps the status it had there
+        if self.seed_status and "seed" in event.tags:
+            known = {"valid": VALID, "historical": HISTORICAL}.get(self.seed_status.get(str(event.data)))
+            if known is not None:
+                return known
         # explicit override by the module (based on a record date, etc.)
         for level in ("current", "historical"):
             if f"freshness-{level}" in event.tags:
@@ -209,6 +238,11 @@ class validity(BaseInterceptModule):
             return None
         if OWNER_UNVERIFIED_TAG in event.tags:
             return VERDICT_FALSE, "owner not verified"
+        if str(event.host or "").startswith(WILDCARD_PLACEHOLDER):
+            return (
+                VERDICT_FALSE,
+                f"wildcard placeholder, not a host: every name under {str(event.host)[len(WILDCARD_PLACEHOLDER) :]} resolves",
+            )
         if event.type not in DNS_NAME_TYPES + ("EMAIL_ADDRESS",):
             return None
         if getattr(event.module, "_type", "") == "DNS":
@@ -216,8 +250,6 @@ class validity(BaseInterceptModule):
             return None
         host = str(event.host or "")
         if not host or self.helpers.is_ip(host):
-            return None
-        if host.startswith("_wildcard."):
             return None
         if not self.helpers.tldextract(host).suffix:
             return VERDICT_FALSE, f"no public suffix: {host}"
@@ -231,7 +263,11 @@ class validity(BaseInterceptModule):
         return None
 
     def check_relation(self, event):
-        if event.type not in DNS_NAME_TYPES or "seed" in event.tags:
+        if "seed" in event.tags:
+            return None
+        if event.type in HOST_FINDING_TYPES:
+            return self.check_host_relation(event)
+        if event.type not in DNS_NAME_TYPES:
             return None
         module = event.module
         if getattr(module, "meta", {}).get("proves_relation"):
@@ -242,6 +278,21 @@ class validity(BaseInterceptModule):
             # a DNS record of a valid parent: the target uses this resource now
             return None
         return VERDICT_UNRELATED, f"out-of-scope name without proven relation ({module})"
+
+    def check_host_relation(self, event):
+        host = str(event.host or "")
+        if event.scope_distance <= 0 or not host or self.helpers.is_ip(host):
+            return None
+        module = event.module
+        if getattr(module, "_type", "") == "DNS" or getattr(module, "meta", {}).get("proves_relation"):
+            return None
+        parent = event.parent
+        if parent is not None and parent is not event and str(getattr(parent, "host", "") or "") == host:
+            # found on the name itself (speculate port of a name, http answer of a URL): the name was checked
+            return None
+        if self.scan.in_scope(host):
+            return None
+        return VERDICT_FALSE, f"{event.type} on an out-of-scope host without proven relation ({module})"
 
     def check_http(self, event):
         if event.type != "URL":
@@ -320,10 +371,14 @@ class validity(BaseInterceptModule):
 
         # third-party infrastructure: an out-of-scope name from a target DNS record (mail, DNS, cloud, monitoring -
         # the target uses it, but it is not its asset) and its out-of-scope descendants (IP, ASN, geolocation)
-        third_party = (
-            status != FALSE
-            and event.scope_distance > 0
-            and ((event.type in DNS_NAME_TYPES and getattr(event.module, "_type", "") == "DNS") or parent_state[4])
+        # ... and an address that ipowner found to be the front of someone else's service (CNAME to a provider,
+        # anti-DDoS/CDN network) together with what is found on it
+        third_party = status != FALSE and (
+            (event.type == "IP_ADDRESS" and IP_PROXY_TAG in event.tags)
+            or (
+                event.scope_distance > 0
+                and ((event.type in DNS_NAME_TYPES and getattr(event.module, "_type", "") == "DNS") or parent_state[4])
+            )
         )
 
         state = [status, rel, reason, verdict == VERDICT_UNRELATED, third_party]

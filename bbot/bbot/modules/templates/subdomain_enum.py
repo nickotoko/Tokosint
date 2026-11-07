@@ -50,7 +50,10 @@ class subdomain_enum(BaseModule):
         query = self.make_query(event)
         results = await self.query(query)
         if results:
+            # parse_results may return {hostname: date the source last saw it} instead of a list of hostnames
+            last_seen = results if isinstance(results, dict) else {}
             for hostname in set(results):
+                seen = last_seen.get(hostname)
                 if hostname:
                     try:
                         hostname = self.helpers.validators.validate_host(hostname)
@@ -63,13 +66,16 @@ class subdomain_enum(BaseModule):
                             "DNS_NAME",
                             event,
                             abort_if=self.abort_if,
+                            last_seen=seen,
                             context=f'{{module}} searched {self.source_pretty_name} for "{query}" and found {{event.type}}: {{event.pretty_string}}',
                         )
 
     async def handle_event_paginated(self, event):
         query = self.make_query(event)
         async for result_batch in self.query_paginated(query):
+            last_seen = result_batch if isinstance(result_batch, dict) else {}
             for hostname in set(result_batch):
+                seen = last_seen.get(hostname)
                 try:
                     hostname = self.helpers.validators.validate_host(hostname)
                 except ValueError as e:
@@ -81,6 +87,7 @@ class subdomain_enum(BaseModule):
                         "DNS_NAME",
                         event,
                         abort_if=self.abort_if,
+                        last_seen=seen,
                         context=f'{{module}} searched {self.source_pretty_name} for "{query}" and found {{event.type}}: {{event.pretty_string}}',
                     )
 
@@ -123,7 +130,9 @@ class subdomain_enum(BaseModule):
                 self.info(f'Query "{query}" failed (no response)')
                 return []
             try:
-                results = list(await parse_fn(response, query))
+                results = await parse_fn(response, query)
+                # {hostname: last seen} keeps the source dates; anything else becomes a list of hostnames
+                results = {str(k): v for k, v in results.items()} if isinstance(results, dict) else list(results)
             except Exception as e:
                 if response:
                     self.info(

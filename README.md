@@ -38,9 +38,16 @@ A built-in intercept module tags every observation after DNS resolution:
   - **Relation:** an out-of-scope DNS name is valid only with a proven relation (a target DNS record, or promotion
     by the `related_domains` module). A link on a page, a shared IP or a shared certificate is not proof: such names
     are false and hidden from the output (the relation analyser still sees them and may promote the domain).
+  - **Host relation:** a port, URL or technology that a search source reports on an out-of-scope host directly (not
+    through a checked name) is false.
   - **Junk:** names without a public suffix (`hand@3x.png`), `example.*`, placeholder emails, profiles whose owner
-    could not be verified (found only because the name matched).
+    could not be verified (found only because the name matched), BBoT's wildcard placeholder `_wildcard.<domain>`.
 - **Third party:** providers from the target's DNS records (mail, DNS, cloud) are a valid relation tagged `third-party`.
+- **Whose IP** (`bbot/bbot/modules/internal/ipowner.py`): PTR into the target or an AS named after it → the target's own;
+  reached through a CNAME to a foreign domain, the address of an out-of-scope name, or an anti-DDoS / CDN / site-builder
+  network → `ip-proxy` (third party: its ports and products belong to the provider); cloud / hosting → `ip-hosting`.
+- **Seeds keep their status:** `modules.validity.seed_status_file` — used when a finished scan is enriched with new
+  sources, so a historical finding stays historical.
 - False findings are written to `scans/<scan>/validity_false.jsonl` with the reason.
 - The final status of a finding is recomputed over the graph of all discovery paths (`web/validity.py`): if a finding
   first arrived from an archive and later from a current source, it and its descendants become valid without
@@ -50,15 +57,28 @@ A built-in intercept module tags every observation after DNS resolution:
 The BBoT module set was cut down to passive modules, each one reviewed (free tier, hardcoded limits, false
 relations); the rest live in `bbot/modules_archive/` and come back with `bin/module restore <name>`.
 New modules: `commoncrawl`, `criminalip`, `crtname`, `hudsonrock`, `netlas`, `robtex`, `shodanct`, `subdomainapi`,
-`thc`, `related_domains` (promotes related domains into scope on DNS evidence: NS/MX/SPF/DMARC).
+`thc`, `related_domains` (promotes related domains into scope on DNS evidence: NS/MX/SPF/DMARC), `circl_pdns`
+(CIRCL Passive DNS), `detectzestack` (website technology stack; works without a key through its demo endpoint).
 Fixed or reworked, among others: `virustotal` (pagination), `shodan_idb` (API key mode), `censys_ip`
 (Platform API v3), `trickest`, `hunterio`, `pgp`, `social`, `dockerhub` (profile ownership check), `trufflehog`
-(secret verification is off by default — it would mean using leaked credentials).
+(secret verification is off by default — it would mean using leaked credentials), `fofa` (strict domain/certificate
+matching — FOFA's `*=` is a substring match — and host details only for the target's own IPs).
+Every event can carry `last_seen` — the date the source itself reports (passive DNS, FOFA, Shodan banners, OTX,
+LeakIX, Netlas); every API request is counted with its outcome (ok, rate limit, quota, auth, unavailable) in
+`scans/<scan>/module_stats.json`.
 
 ### Web interface (`web/`, no dependencies, no build step)
 - **Analysis** — start scans, list scans, findings with their status (valid / historical / false with the reason),
   DNS check and third-party tag; filters, sorting, a details card with the discovery context;
-  a per-source report (what each source found and how much, which sources did not start and why).
+  a per-source report (what each source found and how much, which sources failed during the scan — unavailable,
+  rate limited, out of quota — and the quota spent and left, from the source's account API where it has one).
+  Ports, HTTP status codes and technologies (with the ports they were seen on) are separate columns with filters;
+  "domains (2nd level)" shows registrable domains only; findings reached through a related domain are marked
+  *via <domain>*. **Last seen** is the source's own date, the scan date is kept separately.
+  The discovery chain of a finding is drawn as a graph (findings are blocks, edges are "found from" with the source).
+  The status of a finding can be changed by hand; the computed status and every change are kept in a log.
+  **Enrich** runs new sources over the findings a finished scan already has (same scope, statuses kept); the result
+  is shown together with the original scan.
   Export to CSV or JSON: the full scan or one finding type, filtered by source and validation status.
 - **Timeline** — new valid findings of a company scan after scan. The first scan of a company is its baseline;
   every later scan adds the valid findings the company did not have before.
@@ -68,6 +88,8 @@ Fixed or reworked, among others: `virustotal` (pagination), `shodan_idb` (API ke
   rebuilt in chronological order, without alerts); starting a scan for a company.
 - **Sources** — module metadata: input/output, API key, quotas, data freshness, health check result.
 - **Keys** — add, change and delete API keys (values are never sent back to the UI, only a mask).
+- **How it works** — the recursion engine, scope distance, validation checks and IP ownership with diagrams, and
+  BBoT's chord graph of modules and event types built from this fork's modules.
 - **Telegram alerts** — after a company scan, one summary message, only when new valid findings of the company's alert
   types appear (baseline scans never alert). The bot token and chat id are set on the Keys tab.
 
@@ -145,7 +167,7 @@ bbot/.venv/bin/pytest web/ -q
   geolocation and anti-bot protection.
 - **The checks are heuristics:** shared hosting is detected by the number of names on an IP and the network owner;
   the placeholder email list is a heuristic; a Docker Hub profile owner is verified only by a link to a target domain
-  in the profile. IP validation (AS, anti-DDoS proxies, CDN) and port checks through third-party services are planned.
+  in the profile; IP ownership is decided from PTR, CNAME and AS names. Port checks through third-party services are planned.
 - **Out-of-scope names without a proven relation are hidden:** a related domain reaches the results only if
   `related_domains` promotes it (NS/MX/SPF/DMARC). WHOIS and certificate relations are not used yet.
 - **Source quotas:** many free tiers are small (e.g. hunter.io — 50 requests a month, VirusTotal — 500 a day);
@@ -162,8 +184,9 @@ bbot/            BBoT 3.0.2 fork (modules, core, tests); bbot/modules_archive/ �
 bin/             setup (install), osint (scan), web (UI), module (module set and keys), healthcheck
 config/          bbot.yml — project config; secrets.yml — API keys (not in git), secrets.example.yml — template
 web/             server.py, scans.py, validity.py, apikeys.py, health.py, index.html,
-                 store.py (SQLite), companies.py (company scans, scheduler), notify.py (Telegram), cronexpr.py
-tools/           cdp_drive.py — headless Chrome driver for checking the web UI
+                 store.py (SQLite), companies.py (company scans, scheduler), notify.py (Telegram), cronexpr.py,
+                 quota.py (source quotas), overrides.py (manual statuses), enrich.py (enrichment of finished scans)
+tools/           cdp_drive.py — headless Chrome driver for checking the web UI; revalidate_scan.py
 data/            tokosint.db — companies, timeline, settings (not in git)
 scans/           scan results (not in git)
 ```

@@ -95,8 +95,8 @@ class TestCensys_IP(ModuleTestBase):
         ):
             assert any(e.type == "DNS_NAME" and e.data == name for e in events), f"Failed to detect {name}"
 
-        assert any(e.type == "TECHNOLOGY" and e.data["technology"] == "cpe:2.3:a:openbsd:openssh:8.9" for e in events)
-        assert any(e.type == "TECHNOLOGY" and e.data["technology"] == "java" for e in events)
+        assert any(e.type == "TECHNOLOGY" and e.data["technology"] == "cpe:2.3:a:openbsd:openssh:8.9" and e.port == 22 for e in events)
+        assert any(e.type == "TECHNOLOGY" and e.data["technology"] == "java" and e.data["port"] == 443 for e in events)
         assert not any(e.type == "PROTOCOL" and e.data["protocol"] in ("HTTP", "HTTPS") for e in events)
         assert any(e.type == "PROTOCOL" and e.data["protocol"] == "DNS" for e in events)
         assert any(e.type == "PROTOCOL" and e.data["protocol"] == "SSH" for e in events)

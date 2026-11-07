@@ -184,6 +184,8 @@ aggregate: True
 dnsresolve: True
 # Cloud provider tagging
 cloudcheck: True
+# IP ownership: the target's own, a third-party proxy/SaaS front (CNAME, anti-DDoS/CDN AS) or rented hosting
+ipowner: True
 # IoC validity: valid / historical / false by source freshness and parent status
 validity: True
 # Python API event bridge

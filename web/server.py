@@ -24,6 +24,12 @@ Routes:
   GET /api/telegram         Telegram settings (token masked)
   POST /api/telegram/save   {"token"?, "chat_id"?}
   POST /api/telegram/test   {"chat_id"?} - send a test message
+  GET /api/chain/<name>?type=&data=  every discovery chain of a finding (seed -> ... -> finding, with statuses)
+  GET /api/enrich/<name>?modules=a,b  what enriching a finished scan with these sources would send (seeds, scope)
+  POST /api/enrich/<name>   {"modules": [...]} - run the sources over the scan's findings (web/enrich.py)
+  GET /api/quota            remaining quota of the sources' accounts (cached 60 s; no quota spent)
+  POST /api/status/set      {"scan", "type", "data", "status": valid|historical|false|"", "note"?} - manual status
+  GET /api/status/log       every manual status change with the computed status and the evidence snapshot
 
 Started by bin/web. Listens on 127.0.0.1 and serves scans/ only to its own UI.
 """
@@ -39,7 +45,7 @@ WEB_DIR = Path(__file__).resolve().parent
 ROOT = WEB_DIR.parent
 
 sys.path.insert(0, str(WEB_DIR))
-from _build import build_sources  # noqa: E402
+from _build import build_chord, build_sources  # noqa: E402
 import health  # noqa: E402
 import scans  # noqa: E402
 import apikeys  # noqa: E402
@@ -47,7 +53,19 @@ import companies  # noqa: E402
 import cronexpr  # noqa: E402
 import notify  # noqa: E402
 import store  # noqa: E402
+import overrides  # noqa: E402
+import enrich  # noqa: E402
+import quota  # noqa: E402
 from bbot.core.modules import MODULE_LOADER  # noqa: E402
+
+BBOT_DOCS = ROOT / "bbot" / "docs"
+VEGA_FILES = {
+    "vega.js": BBOT_DOCS / "javascripts" / "vega@5.js",
+    "vega-lite.js": BBOT_DOCS / "javascripts" / "vega-lite@5.js",
+    "vega-embed.js": BBOT_DOCS / "javascripts" / "vega-embed@6.js",
+    "chord.json": BBOT_DOCS / "data" / "chord_graph" / "vega.json",
+}
+VEGA_TYPES = {"js": "application/javascript; charset=utf-8", "json": "application/json; charset=utf-8"}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -75,6 +93,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_file(WEB_DIR / "index.html", "text/html; charset=utf-8")
             if route == "/api/sources":
                 return self._send_json(build_sources())
+            if route == "/api/chord":
+                return self._send_json(build_chord())
+            if route.startswith("/static/vega/"):
+                # BBoT's documentation bundles (vega, vega-embed, vega-lite) and its chord graph spec, served locally
+                name = route[len("/static/vega/"):]
+                if name not in VEGA_FILES:
+                    return self._send_json({"error": "not found"}, 404)
+                return self._send_file(VEGA_FILES[name], VEGA_TYPES[name.rsplit(".", 1)[-1]])
             if route == "/api/health":
                 return self._send_json(health.load())
             if route == "/api/scans":
@@ -106,6 +132,10 @@ class Handler(BaseHTTPRequestHandler):
                     t = cronexpr.next_run(expr, t)
                     runs.append(t.strftime("%Y-%m-%d %H:%M"))
                 return self._send_json({"cron": expr, "next": runs})
+            if route == "/api/quota":
+                return self._send_json({"modules": quota.MODULE_ACCOUNT, "accounts": quota.snapshot(use_cache=True)})
+            if route == "/api/status/log":
+                return self._send_json(store.override_log())
             if route == "/api/telegram":
                 return self._send_json(notify.settings_view())
             if route.startswith("/api/report/"):
@@ -114,11 +144,25 @@ class Handler(BaseHTTPRequestHandler):
                 if report is None:
                     return self._send_json({"error": "scan not found"}, 404)
                 return self._send_json(report)
+            if route.startswith("/api/chain/"):
+                path = scans.safe_scan_path(unquote(route[len("/api/chain/"):]))
+                if path is None:
+                    return self._send_json({"error": "scan not found"}, 404)
+                return self._send_json(scans.discovery_chains(path, query.get("type", ""), query.get("data", "")))
             if route.startswith("/api/scan/"):
                 path = scans.safe_scan_path(unquote(route[len("/api/scan/"):]))
                 if path is None:
                     return self._send_json({"error": "scan not found"}, 404)
-                return self._send_json(scans.aggregate_scan(path))
+                name = unquote(route[len("/api/scan/"):])
+                # the scan together with its enrichments (new sources run over its findings later)
+                return self._send_json(overrides.apply(name, scans.aggregate_scan(path, include_enrichments=True)))
+            if route.startswith("/api/enrich/"):
+                name = unquote(route[len("/api/enrich/"):])
+                modules = [m for m in str(query.get("modules", "")).split(",") if m]
+                try:
+                    return self._send_json(enrich.summary(enrich.plan(name, modules, MODULE_LOADER.preloaded())))
+                except enrich.EnrichError as e:
+                    return self._send_json({"error": str(e)}, e.code)
         except Exception as e:  # noqa: BLE001
             return self._send_json({"error": str(e)}, 500)
         self._send_json({"error": "not found"}, 404)
@@ -145,6 +189,13 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(payload, dict):
                 raise scans.ScanError("a JSON object is expected")
             known = {s["name"] for s in build_sources()}
+            if route.startswith("/api/enrich/"):
+                name = unquote(route[len("/api/enrich/"):])
+                modules = payload.get("modules") or []
+                if not isinstance(modules, list) or any(m not in known for m in modules):
+                    return self._send_json({"error": "unknown source in the module list"}, 400)
+                job = enrich.start(name, modules, MODULE_LOADER.preloaded(), known, on_finish=companies.process_scan)
+                return self._send_json(job, 201)
             if route == "/api/scans/start":
                 if payload.get("company_id"):
                     targets = scans.parse_targets(payload.get("targets")) if payload.get("targets") else None
@@ -169,6 +220,8 @@ class Handler(BaseHTTPRequestHandler):
             if route == "/api/schedules/delete":
                 store.delete_schedule(int(payload.get("id") or 0))
                 return self._send_json({"ok": True})
+            if route == "/api/status/set":
+                return self._send_json(overrides.set_status(payload))
             if route == "/api/telegram/save":
                 return self._send_json(notify.save_settings(payload))
             if route == "/api/telegram/test":
@@ -197,14 +250,20 @@ class Handler(BaseHTTPRequestHandler):
         sys.stderr.write("  " + (fmt % args) + "\n")
 
 
-def health_loop():
-    """Background health check: on start if health.json is stale (>24h), then once a day."""
+def health_loop(idle_poll=60):
+    """Background health check: on start if health.json is stale (>24h), then once a day.
+
+    Runs in a separate process (health.run_isolated - an in-process BBoT scan kills the server's children on
+    timeout, i.e. the user's scan) and only when no scan is running: the check spends the same source quotas and
+    rate limits, so running both at once makes the user's scan hit 429s."""
     import time
 
     while True:
         try:
             if health.is_stale():
-                health.run_all()
+                while scans.running_job():
+                    time.sleep(idle_poll)
+                health.run_isolated(env=scans._child_env())
         except Exception as e:  # noqa: BLE001
             sys.stderr.write(f"  healthcheck error: {e}\n")
         time.sleep(health.TTL)
@@ -215,6 +274,7 @@ def main():
 
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8777
     store.init()
+    companies.migrate_registries()
     companies.BASE_URL = f"http://127.0.0.1:{port}/#timeline"
     threading.Thread(target=health_loop, daemon=True).start()
     known = lambda: {s["name"] for s in build_sources()}  # noqa: E731

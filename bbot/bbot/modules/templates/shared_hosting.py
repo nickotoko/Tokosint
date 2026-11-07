@@ -37,8 +37,11 @@ class shared_hosting_filter:
         if len(org_name) >= 4:
             self._org_names().add(org_name)
 
+    # ipowner: the address is the front of someone else's service (CNAME to a provider, anti-DDoS/CDN network)
+    shared_hosting_exact_tags = ("ip-proxy",)
+
     def is_shared_infrastructure(self, event):
-        return any(t.startswith(self.shared_hosting_tags) for t in event.tags)
+        return any(t.startswith(self.shared_hosting_tags) or t in self.shared_hosting_exact_tags for t in event.tags)
 
     def own_network_owner(self, *owner_descriptions):
         """Returns the first owner description that names the target organisation, else ''."""

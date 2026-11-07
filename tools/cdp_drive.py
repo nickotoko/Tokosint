@@ -1,7 +1,8 @@
 """Minimal Chrome DevTools Protocol driver for checking the web UI without a browser extension.
 
 Usage: bbot/.venv/bin/python tools/cdp_drive.py http://127.0.0.1:8777/ steps.json
-steps.json is a list of JS expressions (evaluated in the page, promises awaited) and numbers (sleep, seconds).
+steps.json is a list of JS expressions (evaluated in the page, promises awaited), numbers (sleep, seconds) and
+{"screenshot": "file.png", "selector": "css"?} (a PNG of the viewport or of one element).
 Each step prints the first 90 characters of the expression, " => " and the returned value; JS exceptions
 and console messages are printed too. Starts its own headless Chrome on port 9333 with a temporary profile.
 """
@@ -35,9 +36,24 @@ try:
                         print("console:", [a.get("value") for a in m["params"]["args"]])
                     if m.get("id") == my: return m
             await call("Runtime.enable"); await call("Page.enable")
+            await call("Emulation.setDeviceMetricsOverride", width=1400, height=1000, deviceScaleFactor=1, mobile=False)
             await call("Page.navigate", url=URL); await asyncio.sleep(2)
             for step in STEPS:
                 if isinstance(step, (int, float)): await asyncio.sleep(step); continue
+                if isinstance(step, dict) and "screenshot" in step:
+                    # {"screenshot": "/path/shot.png", "selector": "#dlg"?} - the whole viewport or one element
+                    params = {"format": "png"}
+                    if step.get("selector"):
+                        box = await call("Runtime.evaluate", returnByValue=True, expression=(
+                            "(()=>{const r=document.querySelector(%s).getBoundingClientRect();"
+                            "return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height}})()" % json.dumps(step["selector"])))
+                        # page coordinates + captureBeyondViewport: elements below the fold are captured too
+                        params["clip"] = {**box["result"]["result"]["value"], "scale": 1}
+                        params["captureBeyondViewport"] = True
+                    shot = await call("Page.captureScreenshot", **params)
+                    import base64
+                    open(step["screenshot"], "wb").write(base64.b64decode(shot["result"]["data"]))
+                    print("> screenshot", step["screenshot"]); continue
                 r = await call("Runtime.evaluate", expression=step, awaitPromise=True, returnByValue=True)
                 res = r.get("result", {})
                 print(">", step[:90].replace("\n", " "), "=>", res.get("result", {}).get("value", res.get("exceptionDetails", {}).get("text")))

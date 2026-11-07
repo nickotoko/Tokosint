@@ -64,6 +64,7 @@ class netlas(subdomain_enum):
                 "DNS_NAME",
                 parent=event,
                 abort_if=self.abort_if,
+                last_seen=seen or None,
                 context=f'{{module}} searched Netlas for "{query}" and found {{event.type}}: {{event.pretty_string}}{seen_str}',
             )
 

@@ -65,7 +65,10 @@ def _ingest(name, alert):
     if status != "FINISHED":
         store.set_alert_result(name, f"scan {status or 'unfinished'}: not ingested")
         return None
-    result = store.ingest(name, scans.aggregate_scan(path, with_false=False), scans.scan_started_at(path))
+    import overrides  # overrides imports this module
+
+    findings = overrides.apply(name, scans.aggregate_scan(path, with_false=False))
+    result = store.ingest(name, findings, scans.scan_started_at(path))
     if alert:
         company = store.get_company(result["company_id"])
         store.set_alert_result(name, notify.alert_new_findings(company, name, result, BASE_URL))
@@ -90,6 +93,22 @@ def attach_scans(company_id, names):
             raise store.StoreError(f"scan {name} not found", 404)
         store.link_scan(name, company_id, started_at=scans.scan_started_at(path))
     return rebuild(company_id)
+
+
+# Bump when the finding key or status of aggregated findings changes (e.g. v2: TECHNOLOGY keyed by the technology,
+# not its host; manual status overrides): registries built by an older version are rebuilt once, without alerts -
+# otherwise the next scan would report every re-keyed finding as new.
+REGISTRY_VERSION = "2"
+
+
+def migrate_registries():
+    if store.get_setting("registry_version") == REGISTRY_VERSION:
+        return []
+    done = [(co["id"], rebuild(co["id"])) for co in store.list_companies()]
+    store.set_setting("registry_version", REGISTRY_VERSION)
+    if done:
+        _log(f"registry v{REGISTRY_VERSION}: rebuilt {len(done)} companies")
+    return done
 
 
 def rebuild(company_id):

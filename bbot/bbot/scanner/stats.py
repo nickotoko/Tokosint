@@ -140,11 +140,43 @@ class ScanStats:
         table.sort(key=lambda x: self.module_stats[x[0]].produced_total, reverse=True)
         return [header] + table
 
+    def as_dict(self):
+        """Per-module counters for the scan's module_stats.json (requests and their outcomes, events)."""
+        return {
+            name: stat.as_dict()
+            for name, stat in self.module_stats.items()
+            if name != "SEED" and not name.startswith("_")
+        }
+
     def _make_table(self):
         table = self.table()
         if len(table) == 1:
             table += [["None", "None", "None"]]
         return table[1:], table[0]
+
+
+# Outcome of an API request (BaseModule.api_request, every attempt counts: retries spend quota too)
+QUOTA_HINTS = ("quota", "credit", "limit exceeded", "exceeded the", "insufficient", "upgrade your", "payment")
+
+
+def classify_response(r, success):
+    """ok / unavailable (no answer: network, timeout) / rate_limit (429) / quota (402 or a quota message) /
+    auth (401, 403) / server_error (5xx) / error (any other failed answer)."""
+    if r is None:
+        return "unavailable"
+    if success:
+        return "ok"
+    status = getattr(r, "status_code", 0) or 0
+    text = str(getattr(r, "text", "") or "")[:2000].lower()
+    if status == 402 or (status in (400, 403, 429) and any(h in text for h in QUOTA_HINTS)):
+        return "quota"
+    if status == 429:
+        return "rate_limit"
+    if status in (401, 403):
+        return "auth"
+    if status >= 500:
+        return "server_error"
+    return "error"
 
 
 class ModuleStat:
@@ -154,6 +186,36 @@ class ModuleStat:
         self.produced_total = 0
         self.consumed = {}
         self.consumed_total = 0
+        self.requests = {}
+        self.requests_total = 0
+        # outcome -> a short sample of the last failure ("HTTP 429: ..."), for the scan report
+        self.request_errors = {}
+        self.first_failure = {}
+
+    def record_request(self, r, success):
+        outcome = classify_response(r, success)
+        self.requests_total += 1
+        _increment(self.requests, outcome)
+        if outcome != "ok":
+            status = getattr(r, "status_code", None)
+            body = " ".join(str(getattr(r, "text", "") or "").split())[:160]
+            # an API may echo the request back: never keep the module's keys in the sample
+            for key in getattr(self.module, "_api_keys", None) or []:
+                if key and len(str(key)) >= 6:
+                    body = body.replace(str(key), "***")
+            sample = f"HTTP {status}: {body}" if status else "no response (network error or timeout)"
+            self.request_errors[outcome] = sample
+            self.first_failure.setdefault(outcome, time.time())
+
+    def as_dict(self):
+        return {
+            "produced": self.produced_total,
+            "consumed": self.consumed_total,
+            "requests": self.requests_total,
+            "outcomes": dict(self.requests),
+            "errors": dict(self.request_errors),
+            "first_failure": dict(self.first_failure),
+        }
 
     def increment_produced(self, event):
         self.produced_total += 1

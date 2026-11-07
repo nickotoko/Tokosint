@@ -94,6 +94,7 @@ class robtex(shared_hosting_filter, BaseModule):
             event_type,
             parent=parent,
             tags=tags,
+            last_seen=last,
             context=f"{{module}} found {{event.type}}: {{event.pretty_string}} in Robtex passive DNS ({relation}, seen {self._date(first)} .. {self._date(last)})",
         )
 

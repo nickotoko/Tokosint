@@ -170,6 +170,7 @@ class BaseEvent:
         "_graph_important",
         "_resolved_hosts",
         "_discovery_context",
+        "_last_seen",
         "_stats_recorded",
         "_internal",
         "_dummy",
@@ -202,6 +203,7 @@ class BaseEvent:
         scan=None,
         tags=None,
         timestamp=None,
+        last_seen=None,
         _dummy=False,
         _internal=None,
     ):
@@ -219,6 +221,8 @@ class BaseEvent:
             scan (Scan, optional): BBOT Scan object. Required unless _dummy is True. Defaults to None.
             tags (list of str, optional): Descriptive tags for the event. Defaults to None.
             timestamp (datetime, optional): Time of event discovery. Defaults to current UTC time.
+            last_seen (float | datetime | str, optional): When the source last observed the finding (its own date,
+                not the scan time). None when the source gives no date.
             _dummy (bool, optional): If True, disables certain data validations. Defaults to False.
             _internal (Any, optional): If specified, makes the event internal. Defaults to None.
 
@@ -249,6 +253,7 @@ class BaseEvent:
         self._dns_children = None
         self._raw_dns_records = None
         self._discovery_context = ""
+        self._last_seen = None
         self._module_consumers = 0
 
         # for creating one-off events without enforcing parent requirement
@@ -302,6 +307,9 @@ class BaseEvent:
             context = getattr(self.module, "default_discovery_context", "")
         if context:
             self.discovery_context = context
+
+        if last_seen is not None:
+            self.last_seen = last_seen
 
     @property
     def data(self):
@@ -489,6 +497,15 @@ class BaseEvent:
     @property
     def discovery_context(self):
         return self._discovery_context
+
+    @property
+    def last_seen(self):
+        """When the source last observed the finding, as a UTC unix timestamp (None - the source gave no date)."""
+        return self._last_seen
+
+    @last_seen.setter
+    def last_seen(self, value):
+        self._last_seen = parse_last_seen(value)
 
     @discovery_context.setter
     def discovery_context(self, context):
@@ -963,8 +980,10 @@ class BaseEvent:
         # scan
         if self.scan:
             j["scan"] = self.scan.id
-        # timestamp
+        # timestamp (when the scan found it) and the source's own date of the observation
         j["timestamp"] = utc_datetime_validator(self.timestamp).timestamp()
+        if self.last_seen is not None:
+            j["last_seen"] = self.last_seen
         # parent event
         parent_id = self.parent_id
         if parent_id:
@@ -1980,13 +1999,23 @@ class TECHNOLOGY(DictHostEvent):
         host: str
         technology: str
         url: Optional[str] = None
+        # the port the technology was seen on (a scanner banner), when the source knows it
+        port: Optional[int] = None
         _validate_url = field_validator("url")(validators.validate_url)
         _validate_host = field_validator("host")(validators.validate_host)
+        _validate_port = field_validator("port")(validators.validate_port)
 
     def _sanitize_data(self, data):
         data = super()._sanitize_data(data)
         data["technology"] = data["technology"].lower()
         return data
+
+    @property
+    def port(self):
+        # the banner port if the source gave one, otherwise the URL's
+        if isinstance(self.data, dict) and self.data.get("port"):
+            return self.data["port"]
+        return super().port
 
     def _data_id(self):
         # dedupe by host+port+tech
@@ -2313,6 +2342,7 @@ def make_event(
     tags=None,
     dummy=False,
     internal=None,
+    last_seen=None,
 ):
     """
     Creates and returns a new event object.
@@ -2403,9 +2433,45 @@ def make_event(
         module=module,
         scan=scan,
         tags=tags,
+        last_seen=last_seen,
         _dummy=dummy,
         _internal=internal,
     )
+
+
+def parse_last_seen(value):
+    """A source date -> UTC unix timestamp (float) or None.
+
+    Accepts unix timestamps (seconds or milliseconds), datetimes and date strings
+    ("2024-05-01", "2024-05-01T10:00:00Z", "2024-05-01 10:00:00"). Unparseable values give None, never the scan time.
+    """
+    if value is None or value == "" or isinstance(value, bool):
+        return None
+    if isinstance(value, datetime.datetime):
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=datetime.timezone.utc)
+        return value.timestamp()
+    if isinstance(value, datetime.date):
+        return datetime.datetime(value.year, value.month, value.day, tzinfo=datetime.timezone.utc).timestamp()
+    if isinstance(value, (int, float)):
+        ts = float(value)
+        if ts > 1e11:  # milliseconds
+            ts /= 1000
+        return ts if ts > 0 else None
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return parse_last_seen(float(text))
+    except ValueError:
+        pass
+    text = text.replace("Z", "+00:00")
+    for candidate in (text, text.replace(" ", "T", 1)):
+        try:
+            return parse_last_seen(datetime.datetime.fromisoformat(candidate))
+        except ValueError:
+            continue
+    return None
 
 
 def event_from_json(j):
@@ -2466,6 +2532,7 @@ def event_from_json(j):
         except Exception:
             event.timestamp = datetime.datetime.fromisoformat(j["timestamp"])
         event.scope_distance = j["scope_distance"]
+        event.last_seen = j.get("last_seen", None)
         parent_id = j.get("parent", None)
         if parent_id is not None:
             event._parent_id = parent_id

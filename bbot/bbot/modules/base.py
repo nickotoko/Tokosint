@@ -1349,6 +1349,9 @@ class BaseModule:
 
             r = await self.helpers.request(**kwargs)
             success = r is not None and self._api_response_is_success(r)
+            module_stat = self.scan.stats.get(self)
+            if module_stat is not None:
+                module_stat.record_request(r, success)
 
             if success:
                 self._api_request_failures = 0

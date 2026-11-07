@@ -78,6 +78,19 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS events_company_at ON events (company_id, at DESC);
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS status_overrides (
+    id INTEGER PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL,
+    scan TEXT NOT NULL,
+    type TEXT NOT NULL,
+    data TEXT NOT NULL,
+    status TEXT NOT NULL,
+    computed_status TEXT NOT NULL DEFAULT '',
+    note TEXT NOT NULL DEFAULT '',
+    at REAL NOT NULL,
+    snapshot TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS status_overrides_key ON status_overrides (type, data);
 """
 
 
@@ -388,3 +401,57 @@ def set_setting(key, value):
         else:
             c.execute("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, value))
         c.commit()
+
+
+# ---------- manual status overrides ----------
+# An analyst corrects a finding's status (valid / historical / false). Every change is appended (never updated):
+# the log with the computed status, the analyst's note and a snapshot of the evidence is the training data for
+# improving validation. The latest change of a finding wins; status "" reverts to the computed status.
+# Scope: the company of the scan (all its scans and its timeline) or, for a scan without a company, that scan.
+
+OVERRIDE_STATUSES = ("valid", "historical", "false", "")
+MAX_NOTE = 1000
+
+
+def add_override(scan, type_, data, status, computed_status="", note="", snapshot=None):
+    if status not in OVERRIDE_STATUSES:
+        raise StoreError(f"status must be one of valid, historical, false (or empty to revert), got {status!r}")
+    if not type_ or data is None or not str(data):
+        raise StoreError("type and data of the finding are required")
+    link = scan_link(scan)
+    company_id = link["company_id"] if link else None
+    with _lock, closing(connect()) as c:
+        cur = c.execute(
+            """INSERT INTO status_overrides (company_id, scan, type, data, status, computed_status, note, at, snapshot)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (company_id, scan, type_, str(data), status, computed_status or "", str(note or "")[:MAX_NOTE], time.time(),
+             json.dumps(snapshot or {}, ensure_ascii=False)),  # fmt: skip
+        )
+        c.commit()
+        row = c.execute("SELECT * FROM status_overrides WHERE id = ?", (cur.lastrowid,)).fetchone()
+    return _override_row(row)
+
+
+def _override_row(r):
+    d = dict(r)
+    d["snapshot"] = json.loads(d.get("snapshot") or "{}")
+    return d
+
+
+def overrides_for_scan(scan):
+    """{(type, data): latest override} in effect for a scan (reverts dropped)."""
+    link = scan_link(scan)
+    with closing(connect()) as c:
+        if link:
+            rows = c.execute("SELECT * FROM status_overrides WHERE company_id = ? ORDER BY id", (link["company_id"],))
+        else:
+            rows = c.execute("SELECT * FROM status_overrides WHERE company_id IS NULL AND scan = ? ORDER BY id", (scan,))
+        latest = {(r["type"], r["data"]): _override_row(r) for r in rows}
+    return {k: v for k, v in latest.items() if v["status"]}
+
+
+def override_log(limit=5000):
+    """The whole change log, newest first (for export / analysis)."""
+    with closing(connect()) as c:
+        rows = c.execute("SELECT * FROM status_overrides ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+    return [_override_row(r) for r in rows]

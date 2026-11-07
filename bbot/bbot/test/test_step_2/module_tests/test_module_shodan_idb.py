@@ -154,5 +154,8 @@ class TestShodan_IDB_ApiKey(ModuleTestBase):
         assert "observed 2026-08-02 .. 2026-10-30" in ports["1.2.3.4:443"].discovery_context
         assert "observed 2026-09-01" in ports["1.2.3.4:22"].discovery_context
         assert any(e.type == "DNS_NAME" and e.data == "asdf.blacklanternsecurity.com" for e in events)
-        assert any(e.type == "TECHNOLOGY" and e.data["technology"] == "cpe:2.3:a:nginx:nginx" for e in events)
+        # host API: the technology carries the port of the banner it was seen in
+        techs = [e for e in events if e.type == "TECHNOLOGY" and e.data["technology"] == "cpe:2.3:a:nginx:nginx"]
+        assert techs and {e.data.get("port") for e in techs} == {443}
+        assert techs[0].port == 443 and "on port 443" in techs[0].discovery_context
         assert any(e.type == "FINDING" and "CVE-2021-26855" in e.data["cves"] for e in events)

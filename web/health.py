@@ -78,7 +78,7 @@ async def _run_scan(sources, timeout):
         try:
             await asyncio.wait_for(scan.async_start_without_generator(), timeout)
         except asyncio.TimeoutError:
-            await scan.stop()
+            await scan.async_stop()
         return scan
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -130,6 +130,32 @@ def run_all():
     tmp.write_text(json.dumps(out, ensure_ascii=False, indent=2))
     tmp.replace(HEALTH_FILE)
     return out
+
+
+def run_isolated(env=None, script=None):
+    """Runs the check in its own process (and process group) and waits for it.
+
+    Never run the check's BBoT scan inside the web server: on a timeout BBoT stops the scan with
+    kill_children(), which sends SIGTERM to every child of the *current* process - in the server that is the
+    user's running scan (it died with code -15 exactly when the in-process check hit its timeout)."""
+    import os
+    import signal
+    import subprocess
+    import sys
+
+    proc = subprocess.Popen([sys.executable, str(script or Path(__file__).resolve())], cwd=str(ROOT), env=env,
+                            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                            start_new_session=True)  # fmt: skip
+    try:
+        _, err = proc.communicate(timeout=TIMEOUT + 180)
+    except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGTERM)
+        proc.wait()
+        raise RuntimeError("health check process timed out") from None
+    if proc.returncode != 0:
+        tail = (err or b"").decode("utf-8", "replace").strip().splitlines()[-1:] or [""]
+        raise RuntimeError(f"health check exited with code {proc.returncode}: {tail[0][:200]}")
+    return load()
 
 
 def load():
