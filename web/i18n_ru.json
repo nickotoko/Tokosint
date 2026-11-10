@@ -1,0 +1,712 @@
+{
+ "_comment": "Russian translation of the Tokosint UI. exact: English UI string -> Russian; patterns: regex (anchored, $1.. groups are translated again) -> Russian. Finding data is never translated.",
+ "exact": {
+  "Analysis": "Анализ",
+  "Timeline": "Таймлайн",
+  "Companies": "Компании",
+  "Sources": "Источники",
+  "Keys": "Ключи",
+  "How it works": "Как это работает",
+  "theme": "тема",
+  "Interface language / Язык интерфейса": "Язык интерфейса / Interface language",
+  "＋ New scan": "＋ Новый скан",
+  "＋ New company": "＋ Новая компания",
+  "New scan": "Новый скан",
+  "New company": "Новая компания",
+  "— choose a scan —": "— выберите скан —",
+  "— choose a company —": "— выберите компанию —",
+  "— none —": "— нет —",
+  "Source report": "Отчёт по источникам",
+  "Export": "Экспорт",
+  "Enrich": "Обогатить",
+  "Run new sources over the findings this scan already has": "Прогнать новые источники по находкам этого скана",
+  "Search findings…": "Поиск по находкам…",
+  "Search by source…": "Поиск по источнику…",
+  "Search by name or description…": "Поиск по имени или описанию…",
+  "Port: 443, 8000-9000": "Порт: 443, 8000-9000",
+  "Ports: a list and ranges, e.g. 22,80,443 or 8000-9000": "Порты: список и диапазоны, например 22,80,443 или 8000-9000",
+  "all types": "все типы",
+  "all sources": "все источники",
+  "all flags": "все флаги",
+  "all": "все",
+  "status: any": "статус: любой",
+  "any status": "любой статус",
+  "ownership: any": "владелец: любой",
+  "target assets": "активы цели",
+  "via related domains": "через связанные домены",
+  "third party": "третья сторона",
+  "HTTP: any": "HTTP: любой",
+  "HTTP status code of URLs": "HTTP-код ответа у URL",
+  "HTTP status code of a URL (http module)": "HTTP-код ответа URL (модуль http)",
+  "no code": "без кода",
+  "domains (2nd level)": "домены 2-го уровня",
+  "untagged": "без статуса",
+  "valid": "валидный",
+  "historical": "исторический",
+  "false": "ложный",
+  "Choose a scan to see its findings.": "Выберите скан, чтобы увидеть его находки.",
+  "Loading…": "Загрузка…",
+  "No findings in this scan.": "В этом скане нет находок.",
+  "No scans in scans/. Start a new one.": "В scans/ нет сканов. Запустите новый.",
+  "Failed to get the scan list.": "Не удалось получить список сканов.",
+  "Failed to load the scan.": "Не удалось загрузить скан.",
+  "Type": "Тип",
+  "Finding": "Находка",
+  "Findings": "Находки",
+  "Port": "Порт",
+  "Ports": "Порты",
+  "HTTP": "HTTP",
+  "Source": "Источник",
+  "Status": "Статус",
+  "Last seen": "Последнее наблюдение",
+  "The latest date the sources report for the finding (empty: no source gives a date)": "Самая поздняя дата, которую источники сообщают для находки (пусто — ни один источник не даёт даты)",
+  "Scan date": "Дата скана",
+  "Seen on": "Видели на",
+  "Tags": "Теги",
+  "Description": "Описание",
+  "Severity": "Критичность",
+  "Confidence": "Уверенность",
+  "URL": "URL",
+  "Host": "Хост",
+  "Path": "Путь",
+  "Name": "Имя",
+  "Platform": "Платформа",
+  "Profile": "Профиль",
+  "Technology": "Технология",
+  "Country": "Страна",
+  "City": "Город",
+  "Subnet": "Подсеть",
+  "HTTP status": "HTTP-статус",
+  "the resource answers": "ресурс отвечает",
+  "redirect": "редирект",
+  "client error (404/410: the resource is gone)": "ошибка клиента (404/410 — ресурса больше нет)",
+  "server error": "ошибка сервера",
+  "Found by enrichment": "Найдено обогащением",
+  "+ enrichment": "+ обогащение",
+  "Via related domain": "Через связанный домен",
+  "found through a related domain promoted into scope, not through the target itself": "найдено через связанный домен, поднятый в скоуп, а не через саму цель",
+  "a provider from the target's DNS records: the relation is current, but it is not a target asset": "провайдер из DNS-записей цели: связь актуальна, но это не актив цели",
+  "Why false": "Почему ложный",
+  "How it was found": "Как найдено",
+  "What data": "Какие данные",
+  "resolves": "резолвится",
+  "does not resolve": "не резолвится",
+  "dangling CNAME": "висячий CNAME",
+  "wildcard": "wildcard",
+  "DNS error": "ошибка DNS",
+  "— (no source gives a date)": "— (ни один источник не даёт даты)",
+  " (from the source)": " (по данным источника)",
+  "Show discovery chain": "Показать цепочку обнаружения",
+  "Hide discovery chain": "Скрыть цепочку обнаружения",
+  "Graph": "Граф",
+  "List": "Список",
+  "No discovery path in this scan's output.": "В выводе скана нет пути обнаружения.",
+  "Failed to build the chain: ": "Не удалось построить цепочку: ",
+  "Border: valid green · historical amber · false red. Thick border: this finding. Dashed arc: found again from a later finding.": "Рамка: валидный — зелёная · исторический — жёлтая · ложный — красная. Толстая рамка — эта находка. Пунктирная дуга — найдено повторно от более поздней находки.",
+  "open this finding": "открыть эту находку",
+  "(not in the output)": "(нет в выводе)",
+  "not in the output": "нет в выводе",
+  "omitted": "пропущено",
+  "target": "цель",
+  "record": "запись",
+  " target": " цель",
+  " record": " запись",
+  "dropped as false": "отброшено как ложное",
+  "Change status": "Изменить статус",
+  "The computed status is kept next to yours: every change is logged with the evidence to improve the validation rules.": "Вычисленный статус хранится рядом с вашим: каждое изменение записывается вместе с доказательствами — для улучшения правил валидации.",
+  " Applies to this scan.": " Действует для этого скана.",
+  "Revert to computed": "Вернуть вычисленный",
+  "why (optional): e.g. a CDN address, not the target's": "почему (необязательно): например, адрес CDN, а не цели",
+  "Save": "Сохранить",
+  "sending…": "отправка…",
+  "The status is already ": "Статус уже ",
+  "Companies, schedules, the findings registry and the timeline live in SQLite": "Компании, расписания, реестр находок и таймлайн хранятся в SQLite",
+  "Company": "Компания",
+  "A company scan feeds the company's timeline and alerts; its targets are filled in below.": "Скан компании пополняет её таймлайн и алерты; её цели подставляются ниже.",
+  "Targets": "Цели",
+  "Domains, IPs or networks, one per line (or separated by spaces/commas), up to 20.": "Домены, IP или сети — по одному в строке (или через пробел/запятую), до 20.",
+  "Scan name": "Имя скана",
+  "default: first target and time": "по умолчанию: первая цель и время",
+  "Lowercase latin letters, digits, _ and -. Results go to": "Строчные латинские буквы, цифры, _ и -. Результаты пишутся в",
+  "the whole passive set (-f passive)": "весь пассивный набор (-f passive)",
+  "custom: all checked, uncheck the unwanted": "свой: всё отмечено, снимите лишнее",
+  "pick sources: none checked": "выбрать источники: ничего не отмечено",
+  "check all passive": "отметить все пассивные",
+  "uncheck all": "снять все",
+  "Requests go to third-party sources and spend their quotas. One scan at a time.": "Запросы идут к сторонним источникам и тратят их квоты. Одновременно — один скан.",
+  "Cancel": "Отмена",
+  "Start": "Запустить",
+  "Pick at least one source.": "Выберите хотя бы один источник.",
+  "Open results": "Открыть результаты",
+  "Stop": "Остановить",
+  "Hide": "Скрыть",
+  "Close": "Закрыть",
+  "the whole passive set": "весь пассивный набор",
+  "waiting for a free slot": "ждёт свободного слота",
+  "Sources to run": "Какие источники",
+  "Runs the chosen sources over the findings this scan already has, in the same scope (its targets and the domains promoted into scope). Valid and historical findings of the types the sources take are the seeds; third-party and false ones are not. A historical finding stays historical, and so does what a source finds on it. The result is a separate scan shown together with this one; a company scan feeds the company's timeline.": "Прогоняет выбранные источники по находкам, которые уже есть в этом скане, в том же скоупе (его цели и домены, поднятые в скоуп). Затравки — валидные и исторические находки тех типов, которые принимают источники; третья сторона и ложные не берутся. Историческая находка остаётся исторической, как и то, что источник на ней найдёт. Результат — отдельный скан, который показывается вместе с этим; скан компании пополняет её таймлайн.",
+  "filter sources…": "фильтр источников…",
+  "Pick the sources to see what will be sent.": "Выберите источники, чтобы увидеть, что будет отправлено.",
+  "Counting seeds…": "Считаем затравки…",
+  "Nothing to send: the scan has no findings of these types.": "Отправлять нечего: в скане нет находок этих типов.",
+  "Start enrichment": "Запустить обогащение",
+  "Export findings": "Экспорт находок",
+  "Format": "Формат",
+  "CSV": "CSV",
+  "JSON": "JSON",
+  "full export (all types)": "полный экспорт (все типы)",
+  "Validation status": "Статус валидации",
+  "Download": "Скачать",
+  "CSV: one row per finding, sources joined with “;”. JSON: full records with details, discovery contexts and false reasons.": "CSV: строка на находку, источники через «;». JSON: полные записи с деталями, контекстами обнаружения и причинами ложности.",
+  "Report: ": "Отчёт: ",
+  "Problems during the scan": "Проблемы во время скана",
+  "sources with problems": "источники с проблемами",
+  "sources found data": "источники с данными",
+  "found data": "нашёл данные",
+  "no data": "нет данных",
+  "did not start": "не запустился",
+  "runtime error": "ошибка выполнения",
+  "Only here": "Только здесь",
+  "Quota: spent · left": "Квота: потрачено · осталось",
+  "Quotas / limits": "Квоты / лимиты",
+  "Data freshness": "Актуальность данных",
+  "Status (health check)": "Статус (хелчек)",
+  "Failed to build the report: ": "Не удалось построить отчёт: ",
+  " No console log: sources without data and setup errors are not shown.": " Нет консольного лога: источники без данных и ошибки запуска не показаны.",
+  "This scan has no request statistics (scanned before request counting): failed requests are not known, only modules that did not start or stopped.": "У этого скана нет статистики запросов (сделан до учёта запросов): неудачные запросы неизвестны, видны только модули, которые не запустились или остановились.",
+  "current account state (no snapshot for this scan)": "текущее состояние аккаунта (снимка для этого скана нет)",
+  "account, before the scan": "аккаунт, до скана",
+  "account, after the scan": "аккаунт, после скана",
+  "Valid/hist.: the final status of the finding across all paths. dnsresolve: records from live DNS resolution.": "Валид./ист.: итоговый статус находки по всем путям. dnsresolve: записи живого DNS-резолва.",
+  "Input": "Вход",
+  "Output": "Выход",
+  "Key": "Ключ",
+  "Freshness": "Актуальность",
+  "Flags": "Флаги",
+  "Author": "Автор",
+  "Checked": "Проверено",
+  "returns data": "отдаёт данные",
+  "down": "недоступен",
+  "no key": "нет ключа",
+  "local": "локальный",
+  "freshness: any": "актуальность: любая",
+  "current data": "текущие данные",
+  "historical data": "исторические данные",
+  "derived": "производные",
+  "current": "текущий",
+  "key: any": "ключ: любой",
+  "key required": "нужен ключ",
+  "API key required": "нужен API-ключ",
+  "🔑 required": "🔑 нужен",
+  "any event (in/out)": "любое событие (вход/выход)",
+  "not checked yet": "ещё не проверялся",
+  "Keys are stored in": "Ключи хранятся в",
+  "(mode 600) and are picked up by the next scan. Values are never sent back to the UI, only a mask.": "(права 600) и подхватываются следующим сканом. Значения никогда не возвращаются в интерфейс — только маска.",
+  "set": "задан",
+  "not set": "не задан",
+  "required but not set": "нужен, но не задан",
+  "Delete": "Удалить",
+  "Telegram alerts": "Алерты в Telegram",
+  "One summary message per company scan, only when new valid findings of the company's alert types appear. Create a bot with @BotFather, add it to a chat and put the chat id here (a company may override it).": "Одно сводное сообщение на скан компании и только при новых валидных находках выбранных типов. Создайте бота через @BotFather, добавьте его в чат и укажите здесь chat id (у компании он может быть свой).",
+  "bot token": "токен бота",
+  "Save token": "Сохранить токен",
+  "Delete token": "Удалить токен",
+  "default chat id, e.g. -1001234567890": "chat id по умолчанию, например -1001234567890",
+  "Save chat id": "Сохранить chat id",
+  "Send test message": "Отправить тестовое сообщение",
+  "chat id saved": "chat id сохранён",
+  "test message sent": "тестовое сообщение отправлено",
+  "Delete the Telegram bot token?": "Удалить токен Telegram-бота?",
+  "Name ": "Имя ",
+  "Alerts": "Алерты",
+  "Schedules": "Расписания",
+  "Last scan": "Последний скан",
+  "Scans": "Сканы",
+  "No companies yet. Create one, then start scans for it or attach existing scans.": "Компаний пока нет. Создайте компанию, затем запускайте для неё сканы или привяжите существующие.",
+  "Root domains, IPs or networks used for the company's scans, up to 20.": "Корневые домены, IP или сети для сканов компании, до 20.",
+  "send alerts about new valid findings": "присылать алерты о новых валидных находках",
+  "chat id override (optional)": "свой chat id (необязательно)",
+  "Alert types (none checked = all types):": "Типы для алертов (ничего не отмечено — все типы):",
+  "Existing scans": "Существующие сканы",
+  "Scans not linked to any company; the ones whose targets match the company's are checked. On save they are attached and the timeline is rebuilt in chronological order, without alerts.": "Сканы без компании; отмечены те, чьи цели совпадают с целями компании. При сохранении они привязываются, а таймлайн пересобирается в хронологическом порядке, без алертов.",
+  "Scheduled scans": "Сканы по расписанию",
+  "cron, e.g. 0 3 * * 1  (minute hour day month weekday)": "cron, например 0 3 * * 1  (минута час день месяц день_недели)",
+  "Add schedule": "Добавить расписание",
+  "Runs use the whole passive set. Missed runs (server stopped) run once on start.": "Запуски используют весь пассивный набор. Пропущенные (сервер был остановлен) выполняются один раз при старте.",
+  "No schedules.": "Расписаний нет.",
+  "Delete company": "Удалить компанию",
+  "Scan now": "Сканировать сейчас",
+  "Attach scans": "Привязать сканы",
+  "Attach": "Привязать",
+  "Existing scans not linked to a company. Attaching rebuilds the company's registry and timeline from all its scans in chronological order, without alerts. Only finished scans are counted.": "Существующие сканы без компании. Привязка пересобирает реестр и таймлайн компании по всем её сканам в хронологическом порядке, без алертов. Учитываются только завершённые сканы.",
+  "No scans without a company.": "Нет сканов без компании.",
+  "Pick at least one scan.": "Выберите хотя бы один скан.",
+  "paused": "на паузе",
+  " · paused": " · на паузе",
+  " · optional": " · необязательно",
+  " · required": " · обязательно",
+  "new findings": "новые находки",
+  "new + baseline": "новые + базовые",
+  "baseline only": "только базовые",
+  "Choose a company. The first scan of a company is its baseline; later scans add the valid findings the company has not had before.": "Выберите компанию. Первый скан компании — базовый; последующие добавляют валидные находки, которых у компании ещё не было.",
+  "new since the baseline: ": "нового с базового скана: ",
+  "not ingested yet": "ещё не обработан",
+  "baseline": "базовый",
+  "new": "новое",
+  "Could not draw the graph: ": "Не удалось нарисовать граф: ",
+  "owner not verified": "владелец не подтверждён",
+  "descendant of a false finding": "потомок ложной находки",
+  " [re-validated]": " [перепроверено]",
+  "[re-validated]": "[перепроверено]",
+  "Edit": "Изменить",
+  "off": "выкл.",
+  "on": "вкл.",
+  "Change": "Изменить",
+  "Add": "Добавить",
+  "no token": "токена нет",
+  "new value": "новое значение",
+  "key value": "значение ключа",
+  "required": "обязательно",
+  "optional": "необязательно",
+  "ok": "ok",
+  "Health check": "Хелчек",
+  "· third party": "· третья сторона",
+  " · third party": " · третья сторона",
+  "hidden": "скрыто",
+  "dropped": "отброшено",
+  "scan target": "цель скана",
+  "Targets:": "Цели:",
+  "Started:": "Начат:",
+  "Duration:": "Длительность:",
+  "Status:": "Статус:",
+  "unique findings": "уникальных находок",
+  "third-party infrastructure": "инфраструктура третьих сторон",
+  "State": "Состояние",
+  "Findings ↓": "Находки ↓",
+  "Findings ↑": "Находки ↑",
+  "Valid": "Валид.",
+  "Hist.": "Ист.",
+  "False": "Ложн.",
+  "Requests": "Запросы",
+  "DNS check of names:": "DNS-проверка имён:",
+  "new since the baseline:": "нового с базового скана:",
+  "alerts disabled for the company": "алерты для компании выключены",
+  "unavailable (no answer)": "недоступен (нет ответа)",
+  "rate limited (HTTP 429)": "рейтлимит (HTTP 429)",
+  "quota exhausted": "квота исчерпана",
+  "key refused (401/403)": "ключ отклонён (401/403)",
+  "server error (5xx)": "ошибка сервера (5xx)",
+  "failed requests": "неудачные запросы",
+  "stopped (error state)": "остановлен (состояние ошибки)",
+  "query credits": "query-кредиты",
+  "scan credits": "scan-кредиты",
+  "API calls": "вызовы API",
+  "API queries": "запросы API",
+  "API data rows": "строки данных API",
+  "requests / hour (this IP)": "запросы / час (этот IP)",
+  "requests / day": "запросы / день",
+  "requests / month": "запросы / месяц",
+  "requests / hour": "запросы / час",
+  "searches": "поиски",
+  "credits": "кредиты",
+  "requests": "запросы"
+ },
+ "patterns": [
+  [
+   "(\\S+) of (\\S+)/mo",
+   "$1 из $2/мес"
+  ],
+  [
+   "(\\S+) of (\\S+)/day",
+   "$1 из $2/день"
+  ],
+  [
+   "(\\S+) of (\\S+)/h",
+   "$1 из $2/ч"
+  ],
+  [
+   ": (.+?) — (\\d+) requests?",
+   ": $1 — запросов: $2"
+  ],
+  [
+   ": (stopped \\(error state\\)|did not start|unavailable \\(no answer\\)|key refused \\(401/403\\)|failed requests|quota exhausted|rate limited \\(HTTP 429\\)|server error \\(5xx\\))",
+   ": $1"
+  ],
+  [
+   "(\\d+) hours?, (\\d+) minutes?, (\\d+) seconds?",
+   "$1 ч $2 мин $3 с"
+  ],
+  [
+   "(\\d+) minutes?, (\\d+) seconds?",
+   "$1 мин $2 с"
+  ],
+  [
+   "(\\d+) seconds?",
+   "$1 с"
+  ],
+  [
+   "(.+): spent (\\S+) · (.+)",
+   "$1: потрачено $2 · $3"
+  ],
+  [
+   "scan (\\S+): not ingested",
+   "скан $1: не обработан"
+  ],
+  [
+   "(\\d+) findings, (\\d+) relations from (\\d+) discovery paths?( \\(the (\\d+) shortest\\))?\\. Top: the scan target; an edge is \"found from\", labelled with the source\\. Click a block to open it\\.",
+   "$1 находок, $2 связей, путей обнаружения: $3. Вверху — цель скана; ребро — «найдено из», подписано источником. Клик по блоку открывает находку."
+  ],
+  [
+   "([A-Z]+) record",
+   "запись $1"
+  ],
+  [
+   "([A-Z]+) record, (.+)",
+   "запись $1, $2"
+  ],
+  [
+   ": (hidden|dropped) — (.+)",
+   ": $1 — $2"
+  ],
+  [
+   "Failed to build the chain: (.+)",
+   "Не удалось построить цепочку: $1"
+  ],
+  [
+   "Failed to build the report: (.+)",
+   "Не удалось построить отчёт: $1"
+  ],
+  [
+   "Could not draw the graph: (.+)",
+   "Не удалось нарисовать граф: $1"
+  ],
+  [
+   "(.+) \\(from the source\\)",
+   "$1 (по данным источника)"
+  ],
+  [
+   "domains \\(2nd level\\): (\\d+)",
+   "домены 2-го уровня: $1"
+  ],
+  [
+   "(\\d+) events",
+   "событий: $1"
+  ],
+  [
+   "(.+) left \\((.+)\\)",
+   "осталось $1 ($2)"
+  ],
+  [
+   "(\\S+) left",
+   "осталось $1"
+  ],
+  [
+   "out-of-scope name without proven relation \\((.+)\\)(.*)",
+   "имя вне скоупа без доказанной связи ($1)$2"
+  ],
+  [
+   "parent is false \\((.+?)\\)(.*)",
+   "родитель ложный ($1)$2"
+  ],
+  [
+   "no public suffix: (.+)",
+   "нет публичного суффикса: $1"
+  ],
+  [
+   "reserved domain: (.+)",
+   "зарезервированный домен: $1"
+  ],
+  [
+   "placeholder email: (.+)",
+   "email-заглушка: $1"
+  ],
+  [
+   "wildcard placeholder, not a host: every name under (\\S+) resolves(.*)",
+   "плейсхолдер wildcard, не хост: под $1 резолвится любое имя$2"
+  ],
+  [
+   "(\\S+) on an out-of-scope host without proven relation \\((.+)\\)(.*)",
+   "$1 на хосте вне скоупа без доказанной связи ($2)$3"
+  ],
+  [
+   "fofa host details of (\\S+): a CDN / proxy / third-party front, not a target asset(.*)",
+   "детали FOFA по $1: фронт CDN / прокси / третьей стороны, не актив цели$2"
+  ],
+  [
+   "fofa host details of (\\S+): FOFA has no target name or certificate on this IP(.*)",
+   "детали FOFA по $1: у FOFA на этом IP нет имени или сертификата цели$2"
+  ],
+  [
+   "fofa result (\\S+) for \"(.+)\": certificate is not for the target \\(substring match\\)(.*)",
+   "результат FOFA $1 по «$2»: сертификат не цели (совпадение по подстроке)$3"
+  ],
+  [
+   "(local|returns data|no data|no key|down|ok): (\\d+)",
+   "$1: $2"
+  ],
+  [
+   "The computed status is kept next to yours: every change is logged with the evidence to improve the validation rules\\. Applies to all scans of (.+) and its timeline\\.",
+   "Вычисленный статус хранится рядом с вашим: каждое изменение записывается вместе с доказательствами — для улучшения правил валидации. Действует для всех сканов $1 и её таймлайна."
+  ],
+  [
+   "The computed status is kept next to yours: every change is logged with the evidence to improve the validation rules\\. Applies to this scan\\.",
+   "Вычисленный статус хранится рядом с вашим: каждое изменение записывается вместе с доказательствами — для улучшения правил валидации. Действует для этого скана."
+  ],
+  [
+   "(.+) · (required|optional)",
+   "$1 · $2"
+  ],
+  [
+   "(\\d+) of (\\d+)",
+   "$1 из $2"
+  ],
+  [
+   "(\\d+) of (\\d+) findings",
+   "$1 из $2 находок"
+  ],
+  [
+   "(\\d+) of (\\d+) findings will be exported",
+   "$1 из $2 находок будет выгружено"
+  ],
+  [
+   "(\\d+) of (\\d+) · (\\d+) set",
+   "$1 из $2 · задано $3"
+  ],
+  [
+   "selected: (\\d+) of (\\d+)",
+   "выбрано: $1 из $2"
+  ],
+  [
+   "Enrich (.+)",
+   "Обогатить $1"
+  ],
+  [
+   "(\\d+) seeds: (.*)",
+   "$1 затравок: $2"
+  ],
+  [
+   "scope: (.*)",
+   "скоуп: $1"
+  ],
+  [
+   "the sources take: (.*)",
+   "источники принимают: $1"
+  ],
+  [
+   "(.*) · enriches the original scan (.+)",
+   "$1 · обогащает исходный скан $2"
+  ],
+  [
+   "(.*) · (\\d+) more not sent \\(limit\\)",
+   "$1 · ещё $2 не отправлено (лимит)"
+  ],
+  [
+   "via (.+)",
+   "через $1"
+  ],
+  [
+   "found by a later enrichment: (.+)",
+   "найдено более поздним обогащением: $1"
+  ],
+  [
+   "(.+) \\(promoted into scope by related_domains\\)",
+   "$1 (поднят в скоуп модулем related_domains)"
+  ],
+  [
+   "set manually \\(was (.+)\\)",
+   "задан вручную (был: $1)"
+  ],
+  [
+   "(.*) set manually \\(computed: (.+)\\)",
+   "$1 задан вручную (вычислен: $2)"
+  ],
+  [
+   "Set manually to (.+) on (.+) \\(computed: (.+)\\)\\.(.*)",
+   "Задан вручную: $1, $2 (вычислен: $3).$4"
+  ],
+  [
+   "hidden: (.+)",
+   "скрыто: $1"
+  ],
+  [
+   "dropped: (.+)",
+   "отброшено: $1"
+  ],
+  [
+   "(Hidden|Dropped) as false: (.+)",
+   "$1 как ложное: $2"
+  ],
+  [
+   "Hidden",
+   "Скрыто"
+  ],
+  [
+   "Dropped",
+   "Отброшено"
+  ],
+  [
+   "(\\d+) ways? this finding was discovered: from the scan target to the finding\\.",
+   "Способов обнаружения: $1 — от цели скана до находки."
+  ],
+  [
+   "(\\d+) ways this finding was discovered, the (\\d+) shortest are shown\\.",
+   "Способов обнаружения: $1, показаны $2 кратчайших."
+  ],
+  [
+   "(\\d+) findings, (\\d+) relations from (\\d+) discovery paths?",
+   "$1 находок, $2 связей из путей обнаружения: $3"
+  ],
+  [
+   "Path (\\d+) · (\\d+) steps?",
+   "Путь $1 · шагов: $2"
+  ],
+  [
+   "(.+) record \\(live DNS\\)",
+   "запись $1 (живой DNS)"
+  ],
+  [
+   "DNS: (.+)",
+   "DNS: $1"
+  ],
+  [
+   "(\\d+) sources",
+   "$1 источников"
+  ],
+  [
+   "Running scan (.+)",
+   "Идёт скан $1"
+  ],
+  [
+   "Stopping scan (.+)",
+   "Останавливается скан $1"
+  ],
+  [
+   "Scan (\\S+) finished: (.*)",
+   "Скан $1 завершён: $2"
+  ],
+  [
+   "Scan (\\S+) exited with code (-?\\d+): (.*)",
+   "Скан $1 завершился с кодом $2: $3"
+  ],
+  [
+   "(\\d+) min (\\d+) s",
+   "$1 мин $2 с"
+  ],
+  [
+   "(\\d+) s",
+   "$1 с"
+  ],
+  [
+   "(\\d+) modules, (\\d+) event types\\.",
+   "$1 модулей, $2 типов событий."
+  ],
+  [
+   "(\\d+) event\\(s\\) · (\\d+) scan\\(s\\)",
+   "событий: $1 · сканов: $2"
+  ],
+  [
+   "(\\d+) new · (\\d+) valid",
+   "новых: $1 · валидных: $2"
+  ],
+  [
+   "baseline · (\\d+) valid findings",
+   "базовый · валидных находок: $1"
+  ],
+  [
+   "(\\d+) compan(y|ies)",
+   "компаний: $1"
+  ],
+  [
+   "Company: (.+)",
+   "Компания: $1"
+  ],
+  [
+   "Attach scans to (.+)",
+   "Привязать сканы к $1"
+  ],
+  [
+   "attached (\\d+) scan\\(s\\): (.*)",
+   "привязано сканов: $1: $2"
+  ],
+  [
+   "last: (.+) \\((.+)\\)",
+   "последний: $1 ($2)"
+  ],
+  [
+   "next (.+)",
+   "следующий $1"
+  ],
+  [
+   "next runs: (.*)",
+   "следующие запуски: $1"
+  ],
+  [
+   "Delete (.+) with its schedules, registry and timeline\\? Scan files are kept\\.",
+   "Удалить $1 вместе с расписаниями, реестром и таймлайном? Файлы сканов останутся."
+  ],
+  [
+   "Delete key (.+)\\?",
+   "Удалить ключ $1?"
+  ],
+  [
+   "Delete schedule (.+)\\?",
+   "Удалить расписание $1?"
+  ],
+  [
+   "Start a scan of (.+) \\((.+)\\) with the whole passive set\\?",
+   "Запустить скан $1 ($2) всем пассивным набором?"
+  ],
+  [
+   "Health check: (.+)",
+   "Хелчек: $1"
+  ],
+  [
+   "Failed to load keys: (.+)",
+   "Не удалось загрузить ключи: $1"
+  ],
+  [
+   "(\\d+) failed",
+   "неудачных: $1"
+  ],
+  [
+   "spent (.+)",
+   "потрачено $1"
+  ],
+  [
+   "limit (.+) per (.+)",
+   "лимит $1 на $2"
+  ],
+  [
+   "account: (.+)",
+   "аккаунт: $1"
+  ],
+  [
+   "token (.+)",
+   "токен $1"
+  ],
+  [
+   "Report: (.+)",
+   "Отчёт: $1"
+  ],
+  [
+   "≈(.+) left \\((.+) requests by scans in the window\\)",
+   "≈осталось $1 ($2 запросов сканов за период)"
+  ],
+  [
+   "(.+) · enrichment of (.+)",
+   "$1 · обогащение $2"
+  ],
+  [
+   "(.+) · running",
+   "$1 · идёт"
+  ],
+  [
+   "Findings: unique \\(type \\+ value\\) per source; only here: not confirmed by any other source\\. (.*)",
+   "Находки: уникальные (тип + значение) по источнику; только здесь — не подтверждены другими источниками. $1"
+  ],
+  [
+   "DNS check of names: (.*)",
+   "DNS-проверка имён: $1"
+  ]
+ ]
+}

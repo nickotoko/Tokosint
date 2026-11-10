@@ -102,3 +102,55 @@ class TestFofaNoHostDetails(TestFofa):
         assert any(e.type == "OPEN_TCP_PORT" and e.data == "asdf.blacklanternsecurity.com:8443" for e in events)
         assert not any(e.type == "OPEN_TCP_PORT" and e.data == "1.2.3.4:8080" for e in events)
         assert not any(e.type == "TECHNOLOGY" for e in events)
+
+
+class TestFofaNoFieldPermissionPaging(ModuleTestBase):
+    """A key without permission for lastupdatetime (FOFA error 820001, HTTP 200): the search is repeated without
+    the field instead of silently returning nothing; results past the first page are fetched too."""
+
+    module_name = "fofa"
+    targets = ["blacklanternsecurity.com"]
+    config_overrides = {"modules": {"fofa": {"api_key": "asdf", "size": 2, "host_details": False}}}
+    search = r"https://fofa\.info/api/v1/search/all\?qbase64=[^&]+&fields="
+
+    async def setup_after_prep(self, module_test):
+        await module_test.mock_dns(
+            {
+                "blacklanternsecurity.com": {"A": ["1.2.3.4"]},
+                "a.blacklanternsecurity.com": {"A": ["1.2.3.4"]},
+                "b.blacklanternsecurity.com": {"A": ["1.2.3.4"]},
+                "paged.blacklanternsecurity.com": {"A": ["1.2.3.4"]},
+            }
+        )
+
+    async def setup_before_prep(self, module_test):
+        module_test.blasthttp_mock.add_response(
+            url="https://fofa.info/api/v1/info/my?key=asdf", json={"error": False, "email": "test@example.com"}
+        )
+        module_test.blasthttp_mock.add_response(
+            url=re.compile(self.search + r"[^&]*lastupdatetime[^&]*&.*key=asdf"),
+            json={"error": True, "errmsg": "[820001] 没有权限搜索lastupdatetime字段"},
+        )
+        module_test.blasthttp_mock.add_response(
+            url=re.compile(self.search + r"(?![^&]*lastupdatetime)[^&]*&size=2&page=1&key=asdf"),
+            json={
+                "error": False,
+                "size": 3,
+                "results": [
+                    ["https://a.blacklanternsecurity.com", "1.2.3.4", "443", ""],
+                    ["b.blacklanternsecurity.com:80", "1.2.3.4", "80", ""],
+                ],
+            },
+        )
+        module_test.blasthttp_mock.add_response(
+            url=re.compile(self.search + r"(?![^&]*lastupdatetime)[^&]*&size=2&page=2&key=asdf"),
+            json={"error": False, "size": 3, "results": [["paged.blacklanternsecurity.com", "1.2.3.4", "80", ""]]},
+        )
+
+    def check(self, module_test, events):
+        names = {e.data for e in events if e.type == "DNS_NAME"}
+        for name in ("a.blacklanternsecurity.com", "b.blacklanternsecurity.com", "paged.blacklanternsecurity.com"):
+            assert name in names, f"{name} missing: {names}"
+        assert any(e.type == "OPEN_TCP_PORT" and e.data == "paged.blacklanternsecurity.com:80" for e in events)
+        module = module_test.scan.modules["fofa"]
+        assert module._search_fields == module.base_search_fields

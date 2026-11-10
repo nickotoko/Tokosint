@@ -6,7 +6,7 @@ steps.json is a list of JS expressions (evaluated in the page, promises awaited)
 Each step prints the first 90 characters of the expression, " => " and the returned value; JS exceptions
 and console messages are printed too. Starts its own headless Chrome on port 9333 with a temporary profile.
 """
-import asyncio, json, subprocess, sys, time, urllib.request, tempfile
+import asyncio, json, os, subprocess, sys, time, urllib.request, tempfile
 import websockets
 
 URL = sys.argv[1]
@@ -36,7 +36,7 @@ try:
                         print("console:", [a.get("value") for a in m["params"]["args"]])
                     if m.get("id") == my: return m
             await call("Runtime.enable"); await call("Page.enable")
-            await call("Emulation.setDeviceMetricsOverride", width=1400, height=1000, deviceScaleFactor=1, mobile=False)
+            await call("Emulation.setDeviceMetricsOverride", width=int(os.environ.get("CDP_WIDTH", 1400)), height=int(os.environ.get("CDP_HEIGHT", 1000)), deviceScaleFactor=1, mobile=False)
             await call("Page.navigate", url=URL); await asyncio.sleep(2)
             for step in STEPS:
                 if isinstance(step, (int, float)): await asyncio.sleep(step); continue

@@ -35,7 +35,10 @@ class fofa(shared_hosting_filter, BaseModule):
 
     class Config(SharedHostingConfig):
         api_key: str | list[str] = Field("", description="FOFA API key", sensitive=True, mandatory=True)
-        size: int = Field(100, description="Max results per search query")
+        size: int = Field(100, description="Results per page of a search query")
+        max_pages: int = Field(
+            5, description="Max pages per search query (each page is a separate API query and spends its quota)"
+        )
         host_details: bool = Field(
             True, description="Query /host/<ip> for per-port products of IPs (not of CDN / proxy / third-party IPs)"
         )
@@ -47,13 +50,31 @@ class fofa(shared_hosting_filter, BaseModule):
     scope_distance_modifier = 1
 
     base_url = "https://fofa.info/api/v1"
-    # lastupdatetime: when FOFA last saw the service (the finding's last_seen)
+    # lastupdatetime: when FOFA last saw the service (the finding's last_seen). Only paid tiers may request it:
+    # others get {"error": true, "errmsg": "[820001] ..."} for the whole query, then we search without it
     search_fields = "host,ip,port,cert.subject.cn,lastupdatetime"
+    base_search_fields = "host,ip,port,cert.subject.cn"
+    no_field_permission = "820001"
     # validity: the IP belongs to a provider the target uses (its MX / NS / SaaS), not to the target
     foreign_ip_tags = ("third-party",)
 
     async def setup(self):
+        self._search_fields = self.search_fields
         return await self.require_api_key()
+
+    def _api_response_is_success(self, r):
+        # FOFA reports errors (bad key, no permission, no F-points) with HTTP 200 and {"error": true}:
+        # count them as failed requests, not as answers without data
+        if not super()._api_response_is_success(r):
+            return False
+        try:
+            j = r.json()
+        except Exception:
+            return True
+        if not (isinstance(j, dict) and j.get("error")):
+            return True
+        # no permission for lastupdatetime: not worth retrying, search() repeats the query without the field
+        return self.no_field_permission in str(j.get("errmsg", "")) and self._search_fields != self.base_search_fields
 
     @property
     def api_retries(self):
@@ -100,15 +121,8 @@ class fofa(shared_hosting_filter, BaseModule):
     async def handle_domain(self, event):
         domain = event.data
         query = self.make_query(event)
-        qbase64 = base64.b64encode(query.encode()).decode()
-        params = {"qbase64": qbase64, "fields": self.search_fields, "size": self.config.get("size", 100)}
-        url = self.helpers.add_get_params(f"{self.base_url}/search/all", params).geturl()
-        j = self._json(await self.api_request(url))
-        if j is None:
-            return
-
         context = f'{{module}} searched FOFA for "{query}" and found {{event.type}}: {{event.data}}'
-        for result in j.get("results", []):
+        async for result in self.search(query):
             if not isinstance(result, (list, tuple)) or len(result) < 3:
                 self.debug(f"Unexpected FOFA result format: {result}")
                 continue
@@ -136,6 +150,41 @@ class fofa(shared_hosting_filter, BaseModule):
                 )
             else:
                 self.debug(f"Skipping FOFA result unrelated to {domain}: {host_or_url} ({ip}:{port}, cn={cert_cn!r})")
+
+    async def search(self, query):
+        """Yields the results of a search query, page by page (up to max_pages)."""
+        qbase64 = base64.b64encode(query.encode()).decode()
+        size = max(1, int(self.config.get("size", 100)))
+        max_pages = max(1, int(self.config.get("max_pages", 5)))
+        fetched = total = 0
+        page = 1
+        while page <= max_pages:
+            params = {"qbase64": qbase64, "fields": self._search_fields, "size": size, "page": page}
+            url = self.helpers.add_get_params(f"{self.base_url}/search/all", params).geturl()
+            r = await self.api_request(url)
+            j = self._raw_json(r)
+            if isinstance(j, dict) and j.get("error"):
+                errmsg = str(j.get("errmsg", ""))
+                if self.no_field_permission in errmsg and self._search_fields != self.base_search_fields:
+                    self.warning(
+                        f"FOFA key may not request lastupdatetime ({errmsg}): searching without it, no last_seen"
+                    )
+                    self._search_fields = self.base_search_fields
+                    continue
+                self.warning(f"FOFA search failed for {query!r}: {errmsg or j}")
+                return
+            if not isinstance(j, dict):
+                return
+            results = j.get("results") or []
+            for result in results:
+                yield result
+            fetched += len(results)
+            total = j.get("size") or 0
+            if not results or len(results) < size or fetched >= total:
+                return
+            page += 1
+        if fetched < total:
+            self.verbose(f"FOFA search {query!r}: {total:,} results, fetched {fetched:,} (max_pages={max_pages})")
 
     @staticmethod
     def name_matches(hostname, domain):
@@ -176,14 +225,19 @@ class fofa(shared_hosting_filter, BaseModule):
                         last_seen=seen,
                     )
 
-    def _json(self, r):
-        """Returns the decoded body of a successful FOFA response, otherwise None."""
+    def _raw_json(self, r):
         if r is None:
             return None
         try:
-            j = r.json()
+            return r.json()
         except Exception as e:
             self.verbose(f"Error parsing FOFA response: {e}")
+            return None
+
+    def _json(self, r):
+        """Returns the decoded body of a successful FOFA response, otherwise None."""
+        j = self._raw_json(r)
+        if j is None:
             return None
         if not isinstance(j, dict) or j.get("error"):
             self.verbose(f"FOFA API returned error: {j.get('errmsg', j) if isinstance(j, dict) else j}")

@@ -1,0 +1,178 @@
+
+      <nav class="doc-toc">
+        <a href="#h-engine">Рекурсивный движок</a><a href="#h-scope">Дистанция скоупа</a><a href="#h-modules">Модули</a>
+        <a href="#h-status">Статус находки</a><a href="#h-checks">Проверки</a><a href="#h-owner">Чьё это</a>
+        <a href="#h-related">Связанные домены</a><a href="#h-paths">Одна находка — много путей</a><a href="#h-dates">Даты и квоты</a>
+      </nav>
+
+      <div class="panel">
+        <h2>Как устроен Tokosint</h2>
+        <p>Tokosint — форк <b>BBOT</b> (рекурсивного движка OSINT) со строгой валидацией каждой находки и каждой связи между
+        находками. BBOT отвечает на вопрос «что можно найти от этой цели»; Tokosint добавляет «существует ли это сейчас,
+        действительно ли это цели и откуда мы это знаем». Только пассивные источники: к цели напрямую ничего не обращается,
+        кроме DNS-резолва через публичные резолверы.</p>
+      </div>
+
+      <div class="panel" id="h-engine">
+        <h3>1. Рекурсивный движок</h3>
+        <p>Всё — это <b>события</b>: имя хоста, IP, порт, технология, email. Скан начинается с <b>затравок</b> (цели) и
+        пропускает каждое событие через один конвейер. Каждый модуль следит за своими типами событий и порождает новые, которые
+        возвращаются в начало того же конвейера: поддомен, найденный одним источником, резолвится, классифицируется,
+        валидируется и затем уходит во все остальные источники, которым нужны поддомены. Рекурсия останавливается сама:
+        уже виденное событие отбрасывается (дедупликация), а слишком далёкое от цели не отдаётся модулям (дистанция скоупа).</p>
+        <svg class="diag" viewBox="0 0 960 250" role="img" aria-label="Конвейер событий BBOT">
+          <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="ar"/></marker></defs>
+          <g class="box"><rect x="10" y="110" width="110" height="60" rx="8"/><text x="65" y="136">Затравки</text><text x="65" y="154" class="sm">цель</text></g>
+          <g class="box"><rect x="150" y="110" width="120" height="60" rx="8"/><text x="210" y="136">Вход</text><text x="210" y="154" class="sm">дедуп · блэклист</text></g>
+          <g class="box hl"><rect x="300" y="60" width="300" height="160" rx="10"/><text x="450" y="84">Цепочка перехвата (по порядку)</text></g>
+          <g class="box"><rect x="316" y="100" width="84" height="100" rx="7"/><text x="358" y="135">dnsresolve</text><text x="358" y="152" class="sm">A/AAAA/CNAME</text><text x="358" y="166" class="sm">MX/NS/TXT/PTR</text><text x="358" y="186" class="sm">приор. 1</text></g>
+          <g class="box"><rect x="408" y="100" width="84" height="100" rx="7"/><text x="450" y="135">ipowner</text><text x="450" y="152" class="sm">чей IP</text><text x="450" y="166" class="sm">(+cloudcheck)</text><text x="450" y="186" class="sm">приор. 3</text></g>
+          <g class="box acc"><rect x="500" y="100" width="84" height="100" rx="7"/><text x="542" y="135">validity</text><text x="542" y="152" class="sm">статус</text><text x="542" y="166" class="sm">ложное → вон</text><text x="542" y="186" class="sm">приор. 4</text></g>
+          <g class="box"><rect x="630" y="110" width="110" height="60" rx="8"/><text x="685" y="136">Выход</text><text x="685" y="154" class="sm">скоуп · граф</text></g>
+          <g class="box"><rect x="770" y="40" width="170" height="44" rx="8"/><text x="855" y="67">модули-источники</text></g>
+          <g class="box"><rect x="770" y="118" width="170" height="44" rx="8"/><text x="855" y="137">вывод</text><text x="855" y="152" class="sm">output.json · CSV · txt</text></g>
+          <g class="box"><rect x="770" y="196" width="170" height="44" rx="8"/><text x="855" y="215">validity_false.jsonl</text><text x="855" y="230" class="sm">ложное + причина</text></g>
+          <path d="M120,140H148" class="ln" marker-end="url(#ar)"/><path d="M270,140H298" class="ln" marker-end="url(#ar)"/>
+          <path d="M400,150H406" class="ln"/><path d="M492,150H498" class="ln"/>
+          <path d="M600,140H628" class="ln" marker-end="url(#ar)"/>
+          <path d="M740,132L768,66" class="ln" marker-end="url(#ar)"/><path d="M740,140H768" class="ln" marker-end="url(#ar)"/>
+          <path d="M584,200 C640,250 700,250 768,222" class="ln dash" marker-end="url(#ar)"/>
+          <path d="M855,40 C855,6 210,6 210,108" class="ln loop" marker-end="url(#ar)"/>
+          <text x="530" y="20" class="sm loopt">новые события возвращаются на вход: рекурсия</text>
+        </svg>
+        <p class="muted">Модули перехвата видят каждое событие раньше остальных и в фиксированном порядке; модуль перехвата в
+        состоянии ошибки остановил бы весь конвейер, поэтому они маленькие и не падают на плохом конфиге. Вывод, ложные находки
+        и статистика запросов по источникам (<code>module_stats.json</code>) пишутся в <code>scans/&lt;скан&gt;/</code>.</p>
+      </div>
+
+      <div class="panel" id="h-scope">
+        <h3>2. Дистанция скоупа</h3>
+        <div class="two">
+          <svg class="diag" viewBox="0 0 360 300" role="img" aria-label="Кольца дистанции скоупа">
+            <circle cx="180" cy="150" r="140" class="ring r2"/><circle cx="180" cy="150" r="95" class="ring r1"/><circle cx="180" cy="150" r="50" class="ring r0"/>
+            <text x="180" y="146" class="b">0</text><text x="180" y="164" class="sm">target.example</text><text x="180" y="178" class="sm">*.target.example</text>
+            <text x="180" y="74" class="b">1</text><text x="180" y="90" class="sm">IP · провайдеры NS/MX</text>
+            <text x="180" y="26" class="b">2</text><text x="180" y="40" class="sm">IP провайдера · его AS</text>
+          </svg>
+          <div>
+            <p>У каждого события есть дистанция от цели: <b>0</b> — цель и её поддомены (и домены, поднятые в скоуп, см.
+            <a href="#h-related">связанные домены</a>), <b>1</b> — один шаг (IP, в который резолвится имя из скоупа,
+            DNS- или почтовый провайдер цели), <b>2+</b> — дальше.</p>
+            <p><b>search distance</b> определяет, с какими событиями могут работать модули (источники ищут по именам из скоупа;
+            модулям, которым нужны IP имён из скоупа, разрешён один лишний шаг); <b>report distance</b> — что попадёт в вывод.
+            Сама по себе дистанция ничего не говорит о том, чья это находка, — для этого и нужна валидация.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="h-modules">
+        <h3>3. Модули и типы событий</h3>
+        <p>Каждый модуль делает одно дело: запрашивает один API, резолвит, классифицирует. Он объявляет, какие типы событий
+        <b>потребляет</b> и какие <b>порождает</b>, а движок связывает модули между собой. Наведите на модуль или тип события,
+        чтобы увидеть его связи: <span class="k prod">порождает</span> / <span class="k cons">потребляет</span>.
+        <span class="muted" id="h-chord-stat"></span></p>
+        <div class="chordwrap"><div id="h-chord"></div></div>
+        <p class="muted">Каждый модуль-источник объявляет и <code>meta.freshness</code> — <b>current</b> (источник видит интернет
+        сейчас: DNS, живые сканеры), <b>historical</b> (архивы, пассивный DNS, логи сертификатов) или <b>inherit</b> (производное
+        от родителя: IP порта). С этого начинается правило статуса ниже.</p>
+      </div>
+
+      <div class="panel" id="h-status">
+        <h3>4. Статус находки</h3>
+        <p>Каждая находка — <span class="st valid">валидная</span> (существует сейчас), <span class="st historical">историческая</span>
+        (существовала, сейчас не подтверждена) или <span class="st false">ложная</span> (не настоящая или не цели). Статус
+        считается вдоль пути обнаружения:</p>
+        <p class="rule">статус = min(актуальность источника, статус родителя) &nbsp;·&nbsp; проверка <b>verified</b> поднимает до валидного</p>
+        <svg class="diag" viewBox="0 30 960 76" role="img" aria-label="Статус вдоль пути">
+          <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" class="ar"/></marker></defs>
+          <g class="node valid"><rect x="10" y="40" width="170" height="56" rx="8"/><text x="95" y="64">target.example</text><text x="95" y="82" class="sm">затравка · валидная</text></g>
+          <g class="node historical"><rect x="240" y="40" width="190" height="56" rx="8"/><text x="335" y="64">old.target.example</text><text x="335" y="82" class="sm">лог crt (истор.) → истор.</text></g>
+          <g class="node historical"><rect x="490" y="40" width="190" height="56" rx="8"/><text x="585" y="64">203.0.113.7</text><text x="585" y="82" class="sm">pDNS исторического имени</text></g>
+          <g class="node valid"><rect x="740" y="40" width="210" height="56" rx="8"/><text x="845" y="64">old.target.example</text><text x="845" y="82" class="sm">резолвится → verified → валид.</text></g>
+          <path d="M180,68H238" class="ln" marker-end="url(#ar2)"/><path d="M430,68H488" class="ln" marker-end="url(#ar2)"/>
+          <path d="M680,68H738" class="ln dash" marker-end="url(#ar2)"/>
+          <text x="209" y="60" class="sm">crt</text><text x="459" y="60" class="sm">robtex</text><text x="709" y="60" class="sm">DNS</text>
+        </svg>
+        <p class="muted">Потомок не может быть актуальнее родителя, если его ничто не подтверждает сейчас: IP из архивной записи
+        мёртвого имени остаётся историческим. Ложные находки убираются из скана (модули с ними не работают) и сохраняются с
+        причиной в <code>validity_false.jsonl</code>; их потомки тоже ложные.</p>
+      </div>
+
+      <div class="panel" id="h-checks">
+        <h3>5. Проверки валидации</h3>
+        <p>Выполняет <code>validity</code> для каждого события по уже известным данным (DNS-записи, теги) — без обращения к цели.
+        Побеждает самый сильный вердикт: ложное &gt; несвязанное &gt; историческое &gt; verified.</p>
+        <div class="tablewrap"><table class="doc-t"><thead><tr><th>Проверка</th><th>К чему</th><th>Вердикт</th></tr></thead><tbody>
+          <tr><td><b>Мусор</b></td><td>имена, email</td><td><span class="st false">ложное</span> нет публичного суффикса (<code>hand@3x.png</code>), зарезервированные домены, email-заглушки (<code>user@…</code>), профили <code>owner-unverified</code>, плейсхолдер wildcard BBOT <code>_wildcard.*</code> и всё на нём</td></tr>
+          <tr><td><b>Связь</b></td><td>имена вне скоупа</td><td><span class="st false">ложное, скрыто</span>, если связь не доказана: DNS-запись валидного родителя (NS/MX/CNAME цели — цель этим пользуется) или модуль, доказывающий связь (related_domains). Ссылка на странице, общий IP или сертификат ничего не доказывают. Скрытые имена остаются видны related_domains.</td></tr>
+          <tr><td><b>Связь хоста</b></td><td>порт / URL / технология</td><td><span class="st false">ложное</span>, если поисковый источник отдал её на хосте вне скоупа напрямую (не через проверенное имя): <code>shop.other.example:443</code> из поиска по target.example</td></tr>
+          <tr><td><b>DNS</b></td><td>имена</td><td><span class="st historical">историческое</span> NXDOMAIN / пусто, CNAME без адреса (висячий); без вердикта при ошибках резолва и wildcard-ответах (wildcard резолвит что угодно); <span class="st valid">verified</span> имя из скоупа резолвится</td></tr>
+          <tr><td><b>HTTP</b></td><td>URL с живым ответом</td><td><span class="st historical">историческое</span> 404/410; без вердикта при 5xx/400; <span class="st valid">verified</span> ресурс из скоупа отвечает</td></tr>
+        </tbody></table></div>
+        <p class="muted">Источники проверяют и свои результаты: у FOFA результат должен быть искомым доменом, его поддоменом или
+        сервером с сертификатом на домен (<code>*=</code> в FOFA — поиск подстроки: <code>*n1.example</code> совпал бы с
+        <code>shopn1.example</code>); обратные запросы (имена на IP) пропускаются для общего хостинга и CDN.</p>
+      </div>
+
+      <div class="panel" id="h-owner">
+        <h3>6. Чьё это: третьи стороны и владелец IP</h3>
+        <svg class="diag" viewBox="0 0 960 216" role="img" aria-label="Решение о владельце IP">
+          <defs><marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" class="ar"/></marker></defs>
+          <g class="box"><rect x="10" y="80" width="120" height="50" rx="8"/><text x="70" y="110">IP-адрес</text></g>
+          <g class="box"><rect x="190" y="10" width="250" height="40" rx="7"/><text x="315" y="35">PTR в цель / AS с именем цели</text></g>
+          <g class="box"><rect x="190" y="62" width="250" height="40" rx="7"/><text x="315" y="87">через CNAME на чужой домен</text></g>
+          <g class="box"><rect x="190" y="114" width="250" height="40" rx="7"/><text x="315" y="139">адрес имени вне скоупа</text></g>
+          <g class="box"><rect x="190" y="160" width="270" height="50" rx="7"/><text x="325" y="181">AS: анти-DDoS / CDN / SaaS · облако</text><text x="325" y="199" class="sm">Cloudflare, Qrator, WordPress.com · Yandex Cloud</text></g>
+          <g class="node valid"><rect x="520" y="10" width="200" height="40" rx="7"/><text x="620" y="35">ip-owner-target</text></g>
+          <g class="node historical"><rect x="520" y="88" width="200" height="40" rx="7"/><text x="620" y="113">ip-proxy → third-party</text></g>
+          <g class="node"><rect x="520" y="170" width="200" height="40" rx="7"/><text x="620" y="195">ip-hosting (без изменений)</text></g>
+          <path d="M130,105L188,30" class="ln" marker-end="url(#ar3)"/><path d="M130,105L188,82" class="ln" marker-end="url(#ar3)"/>
+          <path d="M130,105L188,134" class="ln" marker-end="url(#ar3)"/><path d="M130,105L188,184" class="ln" marker-end="url(#ar3)"/>
+          <path d="M440,30H518" class="ln" marker-end="url(#ar3)"/><path d="M440,82L518,104" class="ln" marker-end="url(#ar3)"/>
+          <path d="M440,134L518,112" class="ln" marker-end="url(#ar3)"/><path d="M460,176L518,118" class="ln dash" marker-end="url(#ar3)"/>
+          <path d="M460,190H518" class="ln dash" marker-end="url(#ar3)"/>
+          <text x="736" y="98" class="sm l">порты и продукты прокси-IP</text>
+          <text x="736" y="113" class="sm l">принадлежат провайдеру: не активы цели,</text>
+          <text x="736" y="128" class="sm l">без обратных запросов и деталей по IP</text>
+        </svg>
+        <p><b>third-party</b> (третья сторона): связь настоящая («цель этим пользуется»), но это не актив цели — почтовые и
+        DNS-провайдеры цели (имена из её MX/NS/TXT), прокси-фронты и то, что на них найдено. Показывается как валидное с
+        пометкой <i>третья сторона</i>, фильтруется во вкладке «Анализ».</p>
+      </div>
+
+      <div class="panel" id="h-related">
+        <h3>7. Связанные домены</h3>
+        <p>Второй бренд или дочерняя компания живут на другом домене. <code>related_domains</code> собирает DNS-доказательства
+        для каждого домена вне скоупа, замеченного рядом с целью, и поднимает его в скоуп только при наличии <b>обратной
+        ссылки</b> — собственные записи кандидата указывают на цель (провайдер никогда не направляет свои записи на клиента):</p>
+        <svg class="diag" viewBox="0 0 960 170" role="img" aria-label="Доказательства связанного домена">
+          <defs><marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" class="ar"/></marker></defs>
+          <g class="node valid"><rect x="20" y="60" width="200" height="50" rx="8"/><text x="120" y="90">target.example</text></g>
+          <g class="node"><rect x="740" y="60" width="200" height="50" rx="8"/><text x="840" y="90">subsidiary.example</text></g>
+          <path d="M738,72 C560,20 400,20 222,72" class="ln" marker-end="url(#ar4)"/>
+          <text x="480" y="26" class="sm">обратная ссылка +3: его NS / MX / SPF / DMARC в скоупе (обязательно)</text>
+          <path d="M222,98 C400,150 560,150 738,98" class="ln dash" marker-end="url(#ar4)"/>
+          <text x="480" y="160" class="sm">прямая +1: NS / MX / SPF цели указывают на него · сосед / email +1</text>
+        </svg>
+        <p class="muted">Для подъёма в скоуп нужны обратная ссылка и сумма баллов ≥ 4. Всё, что найдено через поднятый домен,
+        помечено в «Анализе» как <i>через subsidiary.example</i> (фильтр «через связанные домены»), чтобы активы дочерней
+        компании не смешивались с активами самой цели.</p>
+      </div>
+
+      <div class="panel" id="h-paths">
+        <h3>8. Одна находка — много путей</h3>
+        <p>Находка часто приходит несколькими путями: сначала из архива, позже из живого источника. Веб пересчитывает статус по
+        всему графу наблюдений: <span class="rule">статус(находки) = максимум по путям статуса пути</span> — побеждает лучшее
+        доказательство. Карточка актива показывает все пути графом («Показать цепочку обнаружения»). Аналитик может задать
+        статус вручную; вычисленный хранится рядом, а каждое изменение записывается в журнал (<code>status_overrides</code>)
+        для улучшения правил.</p>
+      </div>
+
+      <div class="panel" id="h-dates">
+        <h3>9. Даты, запросы и квоты</h3>
+        <p><b>Последнее наблюдение</b> — дата, которую сообщает сам источник (<i>time_last</i> пассивного DNS,
+        <i>lastupdatetime</i> FOFA, время баннера Shodan, даты OTX / LeakIX / Netlas); пусто, если источник даты не даёт.
+        <b>Дата скана</b> — когда шёл скан. Каждый API-запрос каждого источника учитывается вместе с исходом (ok, рейтлимит,
+        квота, авторизация, недоступен), а квота аккаунта читается до и после скана — в отчёте скана видно, что упало и сколько
+        потрачено.</p>
+      </div>

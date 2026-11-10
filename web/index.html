@@ -34,18 +34,23 @@
     background: var(--panel); border-bottom: 1px solid var(--line);
     display: flex; align-items: center; gap: 18px; padding: 12px 20px; flex-wrap: wrap; }
   header h1 { font-size: 16px; margin: 0; font-weight: 650; }
-  nav { display: flex; gap: 4px; }
+  nav { display: flex; gap: 4px; flex-wrap: wrap; }
   nav button { font: inherit; border: 0; background: transparent; color: var(--muted);
     padding: 6px 14px; border-radius: 8px; cursor: pointer; }
   nav button.on { background: var(--accent-weak); color: var(--accent); font-weight: 600; }
-  main { max-width: 1150px; margin: 0 auto; padding: 20px; }
+  /* fluid: the tables use the whole screen (a 27" monitor has room for every column); the cap only stops
+     lines from getting absurdly long on ultra-wide screens */
+  html { scrollbar-gutter: stable; }
+  main { max-width: 2400px; margin: 0 auto; padding: 20px clamp(16px, 2vw, 40px); }
   .bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
   input[type=search], select { font: inherit; color: var(--ink); background: var(--panel);
     border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
   input[type=search] { flex: 1; min-width: 180px; }
+  /* a long option (scan name · events · date) must not push the page wider than the screen */
+  select { max-width: 100%; text-overflow: ellipsis; }
   input[type=search].narrow { flex: 0 0 170px; min-width: 0; }
   input.bad { border-color: #c0392b; outline-color: #c0392b; }
-  td.port { max-width: 140px; white-space: normal; }
+  td.port { white-space: normal; }
   .chainbox { margin-top: 14px; }
   .seg { display: flex; gap: 4px; margin: 8px 0; }
   .graphwrap { overflow: auto; max-height: 60vh; border: 1px solid var(--line); border-radius: 6px; background: var(--bg, transparent); }
@@ -82,6 +87,24 @@
      with overflow-x: auto the sticky headers stuck to the wrapper instead of the page and covered the first row */
   .tablewrap { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: clip; }
   table { width: 100%; border-collapse: collapse; }
+  /* Data tables: fixed column widths, so filtering / sorting / a long value never makes the columns jump.
+     Long values are cut (full text in the tooltip and in the card). */
+  table.fixed { table-layout: fixed; }
+  table.fixed td { overflow: hidden; overflow-wrap: anywhere; }
+  .clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+  .clamp1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #r-table col.c-type { width: 150px; } #r-table col.c-port { width: 110px; } #r-table col.c-http { width: 90px; }
+  #r-table col.c-src { width: 18%; } #r-table col.c-st { width: 15%; } #r-table col.c-seen { width: 140px; }
+  #s-table col.c-name { width: 180px; } #s-table col.c-key { width: 125px; } #s-table col.c-fresh { width: 130px; }
+  #s-table col.c-st { width: 145px; }
+  #c-table col.c-name { width: 16%; } #c-table col.c-num { width: 90px; } #c-table col.c-seen { width: 140px; }
+  #c-table col.c-sch { width: 16%; } #c-table col.c-alerts { width: 130px; } #c-table col.c-act { width: 360px; }
+  #k-table col.c-name { width: 220px; } #k-table col.c-key { width: 190px; } #k-table col.c-act { width: 400px; }
+  /* below this width the fixed columns would be squeezed: the table scrolls sideways instead */
+  @media (max-width: 1000px) {
+    .tablewrap { overflow-x: auto; }
+    table.fixed { min-width: 900px; }
+  }
   th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line);
     vertical-align: top; font-size: 13px; }
   th { color: var(--muted); font-weight: 600; user-select: none; position: sticky;
@@ -92,7 +115,7 @@
   tbody tr.click:hover { background: var(--accent-weak); }
   tr:last-child td { border-bottom: 0; }
   td.name, td.data { font-family: var(--mono); word-break: break-all; }
-  td.data { max-width: 420px; }
+  td.data .val { font-weight: 500; }
   td.seen { font-family: var(--mono); color: var(--muted); white-space: nowrap; font-size: 12.5px; }
   .chip { display: inline-block; font-size: 11.5px; padding: 2px 8px; border-radius: 999px;
     background: var(--chip); color: var(--muted); white-space: nowrap; margin: 1px 2px 1px 0; }
@@ -128,7 +151,7 @@
   .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   .btn.primary:hover:not(:disabled) { color: #fff; filter: brightness(1.08); }
   .btn.danger:hover:not(:disabled) { border-color: #d64545; color: #d64545; }
-  dialog.wide { max-width: 1000px; }
+  dialog.wide { max-width: min(1400px, 94vw); }
   .job { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; }
   .job-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .job-head .grow { flex: 1; }
@@ -157,7 +180,7 @@
   .chip.code.c2 { color: #2e9d5b; } .chip.code.c3 { color: var(--accent); } .chip.code.c4 { color: var(--warn); } .chip.code.c5 { color: #d64545; }
   .chip.sev.high, .chip.sev.critical { color: #d64545; } .chip.sev.medium { color: var(--warn); }
   .ctx { font-size: 12.5px; margin: 4px 0; } .ctx b { font-family: var(--mono); font-weight: 600; }
-  .keyform { display: flex; gap: 6px; } .keyform input { font: 12.5px var(--mono); padding: 5px 8px; border: 1px solid var(--line);
+  .keyform { display: flex; gap: 6px; flex-wrap: wrap; } .keyform input { font: 12.5px var(--mono); padding: 5px 8px; border: 1px solid var(--line);
     border-radius: 7px; background: var(--panel); color: var(--ink); min-width: 220px; }
   .btn.sm { padding: 4px 10px; font-size: 12.5px; }
   .srcgrid.scanpick { grid-template-columns: 1fr; }
@@ -183,6 +206,7 @@
   .chip b { color: var(--ink); font-weight: 600; margin-left: 3px; }
   .st.failed, .st.error { color: #d64545; background: color-mix(in srgb, #d64545 14%, transparent); }
   a.theme { margin-left: auto; color: var(--muted); cursor: pointer; font-size: 13px; }
+  a.lang { margin-left: 14px; color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 600; }
 
   /* ---- how it works ---- */
   .doc { max-width: 1060px; margin: 0 auto; }
@@ -226,6 +250,7 @@
     <button id="tab-howto">How it works</button>
   </nav>
   <a class="theme" id="theme">theme</a>
+  <a class="lang" id="lang" title="Interface language / Язык интерфейса">RU</a>
 </header>
 <main>
   <section id="view-sources" hidden>
@@ -254,7 +279,7 @@
       </select>
       <span class="count" id="s-count"></span>
     </div>
-    <div class="tablewrap"><table id="s-table"><thead><tr>
+    <div class="tablewrap"><table id="s-table" class="fixed"><colgroup><col class="c-name"><col><col><col class="c-key"><col class="c-fresh"><col class="c-st"></colgroup><thead><tr>
       <th class="sortable" data-k="name">Source</th>
       <th>Input</th>
       <th>Output</th>
@@ -304,7 +329,7 @@
       </div>
       <pre id="job-log"></pre>
     </div>
-    <div class="tablewrap"><table id="r-table"><thead><tr>
+    <div class="tablewrap"><table id="r-table" class="fixed"><colgroup><col class="c-type"><col><col class="c-port"><col class="c-http"><col class="c-src"><col class="c-st"><col class="c-seen"></colgroup><thead><tr>
       <th class="sortable" data-k="type">Type</th>
       <th class="sortable" data-k="data">Finding</th>
       <th class="sortable num" data-k="port">Port</th>
@@ -338,7 +363,7 @@
       <button class="btn primary" id="c-new">＋ New company</button>
       <span class="count" id="c-count"></span>
     </div>
-    <div class="tablewrap"><table id="c-table"><thead><tr>
+    <div class="tablewrap"><table id="c-table" class="fixed"><colgroup><col class="c-name"><col><col class="c-num"><col class="c-num"><col class="c-seen"><col class="c-sch"><col class="c-alerts"><col class="c-act"></colgroup><thead><tr>
       <th>Company</th><th>Targets</th><th class="num">Findings</th><th class="num">Scans</th><th>Last scan</th>
       <th>Schedules</th><th>Alerts</th><th></th>
     </tr></thead><tbody id="c-body"></tbody></table></div>
@@ -554,7 +579,7 @@
       </select>
       <span class="count" id="k-count"></span>
     </div>
-    <div class="tablewrap"><table id="k-table"><thead><tr>
+    <div class="tablewrap"><table id="k-table" class="fixed"><colgroup><col class="c-name"><col><col class="c-key"><col class="c-act"></colgroup><thead><tr>
       <th>Source</th><th>Description</th><th>Key</th><th></th>
     </tr></thead><tbody id="k-body"></tbody></table></div>
     <div class="count" style="margin-top:10px">Keys are stored in <code>config/secrets.yml</code> (mode 600) and are picked up
@@ -704,6 +729,150 @@
   <div class="dlg-body" id="rep-body"></div>
 </dialog>
 
+<script>
+// ================= interface language =================
+// The UI is written in English; Russian is a translation layer over the rendered DOM: every text node, placeholder
+// and title is looked up in web/i18n_ru.json ("exact" strings and "patterns" for strings with numbers and names),
+// a MutationObserver translates whatever the code renders later. Finding data (names, IPs, values) is never touched:
+// table data cells, code and elements marked data-i18n-skip are skipped. The "How it works" tab has its own Russian
+// text (web/howto_ru.html). The choice is kept in localStorage.
+const I18N = { lang: "en", exact: new Map(), patterns: [], ready: null, howtoRu: null, howtoEn: null };
+// finding data and source texts stay as they are: values, discovery contexts, the scan log, the chord graph labels
+const I18N_SKIP = "script, style, code, pre, textarea, td.data, .chain-data, [data-i18n-skip], #job-log, #h-chord, svg title";
+const I18N_ATTRS = ["placeholder", "title"];
+// patterns only for UI-sized strings: several greedy groups on a long text (a discovery context) cost O(n^3)
+const I18N_MAX_PATTERN_LEN = 240;
+const i18nMemo = new Map();
+function i18nOne(core) {
+  const hit = I18N.exact.get(core);
+  if (hit !== undefined) return hit;
+  if (core.length > I18N_MAX_PATTERN_LEN) return null;
+  if (i18nMemo.has(core)) return i18nMemo.get(core);
+  const out = i18nMatch(core);
+  if (i18nMemo.size > 20000) i18nMemo.clear();
+  i18nMemo.set(core, out);
+  return out;
+}
+function i18nMatch(core) {
+  for (const [re, to] of I18N.patterns) {
+    if (re.test(core)) return core.replace(re, (...m) => to.replace(/\$(\d)/g, (_, i) => i18nAny(m[Number(i)] ?? "")));
+  }
+  return null;
+}
+// a part of a string (a pattern group): exact / pattern, or "a · b" part by part; unknown text stays as it is
+function i18nAny(x) {
+  const one = i18nOne(x);
+  if (one !== null) return one;
+  return x.includes(" · ") ? x.split(" · ").map((p) => i18nOne(p) ?? p).join(" · ") : x;
+}
+function i18nText(text) {
+  // multi-line texts of the markup are looked up with their whitespace collapsed
+  const core = text.trim().replace(/\s+/g, " ");
+  if (!core || !/[A-Za-z]/.test(core)) return null;
+  // "a · b · c": the parts that are known are translated, the rest (names, counts) stays
+  let out = i18nAny(core);
+  if (out === core) return null;
+  const lead = text.match(/^\s*/)[0], trail = text.match(/\s*$/)[0];
+  return lead + out + trail;
+}
+function i18nNode(node) {
+  if (node.nodeType === Node.TEXT_NODE) {
+    const parent = node.parentElement;
+    if (!parent || parent.closest(I18N_SKIP)) return;
+    if (node._i18nSet === node.data) return; // our own write
+    node._en = node.data;
+    const tr = I18N.lang === "ru" ? i18nText(node.data) : null;
+    if (tr !== null && tr !== node.data) { node._i18nSet = tr; node.data = tr; }
+    return;
+  }
+  if (node.nodeType !== Node.ELEMENT_NODE || node.closest(I18N_SKIP)) return;
+  for (const a of I18N_ATTRS) {
+    const v = node.getAttribute(a);
+    if (v === null) continue;
+    const key = "_en_" + a;
+    if (node[key + "_set"] !== v) node[key] = v;
+    const tr = I18N.lang === "ru" ? i18nText(node[key]) : null;
+    const want = tr ?? node[key];
+    if (want !== v) { node[key + "_set"] = want; node.setAttribute(a, want); }
+  }
+  const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (n.nodeType === Node.ELEMENT_NODE) {
+      if (n.matches(I18N_SKIP)) continue;
+      for (const a of I18N_ATTRS) if (n.hasAttribute(a)) i18nNode.attrs(n, a);
+    } else i18nNode(n);
+  }
+}
+i18nNode.attrs = (el, a) => {
+  const v = el.getAttribute(a), key = "_en_" + a;
+  if (el[key + "_set"] !== v) el[key] = v;
+  const tr = I18N.lang === "ru" ? i18nText(el[key]) : null;
+  const want = tr ?? el[key];
+  if (want !== v) { el[key + "_set"] = want; el.setAttribute(a, want); }
+};
+function i18nRestore() {
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (n.nodeType === Node.TEXT_NODE) { if (n._en !== undefined && n.data !== n._en) { n._i18nSet = n._en; n.data = n._en; } }
+    else for (const a of I18N_ATTRS) { if (n["_en_" + a] !== undefined) { n["_en_" + a + "_set"] = n["_en_" + a]; n.setAttribute(a, n["_en_" + a]); } }
+  }
+}
+const i18nObserver = new MutationObserver((muts) => {
+  if (I18N.lang !== "ru") return;
+  for (const m of muts) {
+    if (m.type === "characterData") i18nNode(m.target);
+    else if (m.type === "attributes") i18nNode.attrs(m.target, m.attributeName);
+    else m.addedNodes.forEach((n) => i18nNode(n));
+  }
+});
+function i18nLoad() {
+  if (!I18N.ready) {
+    I18N.ready = Promise.all([
+      fetch("/i18n/ru.json").then((r) => r.json()),
+      fetch("/i18n/howto_ru.html").then((r) => r.text()),
+    ]).then(([d, howto]) => {
+      for (const [k, v] of Object.entries(d.exact || {})) I18N.exact.set(k.trim() === k ? k.replace(/\s+/g, " ") : k, v);
+      I18N.patterns = (d.patterns || []).map(([re, to]) => [new RegExp("^" + re + "$"), to]);
+      I18N.howtoRu = howto;
+    });
+  }
+  return I18N.ready;
+}
+function i18nHowto() {
+  const doc = document.querySelector("#view-howto .doc");
+  if (!doc) return;
+  if (I18N.howtoEn === null) I18N.howtoEn = doc.innerHTML;
+  const html = I18N.lang === "ru" ? I18N.howtoRu : I18N.howtoEn;
+  if (html && doc.innerHTML !== html) {
+    doc.innerHTML = html;
+    // the chord graph lives inside the tab: draw it again in the new markup
+    if (typeof CHORD_DONE !== "undefined") { CHORD_DONE = false; if (!document.querySelector("#view-howto").hidden) loadChord(); }
+  }
+}
+async function setLang(lang) {
+  if (lang === "ru") {
+    try { await i18nLoad(); } catch (e) { lang = "en"; }
+  }
+  I18N.lang = lang;
+  document.documentElement.lang = lang;
+  try { localStorage.setItem("lang", lang); } catch (e) {}
+  i18nHowto();
+  if (lang === "ru") i18nNode(document.body); else i18nRestore();
+  const sw = document.getElementById("lang");
+  if (sw) sw.textContent = lang === "ru" ? "EN" : "RU";
+}
+// confirm/alert messages go through the same dictionary
+const _confirm = window.confirm.bind(window), _alert = window.alert.bind(window);
+window.confirm = (m) => _confirm(I18N.lang === "ru" ? (i18nText(String(m)) ?? m) : m);
+window.alert = (m) => _alert(I18N.lang === "ru" ? (i18nText(String(m)) ?? m) : m);
+document.addEventListener("DOMContentLoaded", () => {
+  i18nObserver.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: I18N_ATTRS });
+  document.getElementById("lang").onclick = () => setLang(I18N.lang === "ru" ? "en" : "ru");
+  let saved = null;
+  try { saved = localStorage.getItem("lang"); } catch (e) {}
+  if (saved === "ru") setLang("ru");
+});
+</script>
 <script>
 const $ = (s) => document.querySelector(s);
 const el = (t, cls, txt) => { const e = document.createElement(t); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
@@ -964,18 +1133,20 @@ function renderResults() {
   for (const a of rows) {
     const tr = el("tr");
     const tdT = el("td", "type"); tdT.appendChild(el("span", "chip", a.type)); tr.appendChild(tdT);
-    const tdD = el("td", "data", a.type === "TECHNOLOGY" ? techLabel(a.data) : a.data);
+    const tdD = el("td", "data"); const label = a.type === "TECHNOLOGY" ? techLabel(a.data) : a.data;
+    const val = el("div", "val clamp", label); val.title = label; tdD.appendChild(val);
     if (a.type === "TECHNOLOGY") {
-      if (techLabel(a.data) !== a.data) tdD.appendChild(el("div", "muted", a.data));
+      if (techLabel(a.data) !== a.data) { const raw = el("div", "muted clamp1", a.data); raw.title = a.data; tdD.appendChild(raw); }
       const w = techWhere(a); if (w) tdD.appendChild(el("div", "muted desc", "on " + (w.length > 220 ? w.slice(0, 220) + "…" : w)));
     }
     const desc = a.details && a.details.description;
-    if (desc) { const d = el("div", "muted desc", desc.length > 220 ? desc.slice(0, 220) + "…" : desc); tdD.appendChild(d); }
+    if (desc) { const d = el("div", "muted desc clamp", desc); d.title = desc; tdD.appendChild(d); }
     if (a.details && a.details.severity) tdD.appendChild(el("span", "chip sev " + a.details.severity.toLowerCase(), a.details.severity));
     const loc = a.details && a.details.redirect_location;
     if (loc) tdD.appendChild(el("div", "muted desc", "→ " + (loc.length > 160 ? loc.slice(0, 160) + "…" : loc)));
     tr.appendChild(tdD);
-    tr.appendChild(el("td", "num port", (a.ports || []).length ? a.ports.join(", ") : "—"));
+    { const pt = (a.ports || []).length ? a.ports.join(", ") : "—"; const td = el("td", "num port"); const v = el("div", "clamp", pt);
+      v.title = pt; td.appendChild(v); tr.appendChild(td); }
     const tdH = el("td", "num"); if ((a.http_status || []).length) tdH.appendChild(httpChips(a, false)); else tdH.textContent = "—"; tr.appendChild(tdH);
     const tdS = el("td"); chips(tdS, a.sources); tr.appendChild(tdS);
     const tdV = el("td"); tdV.appendChild(el("span", "st " + (a.status || "none"), IOC_LABEL[a.status] || "—"));
@@ -987,7 +1158,7 @@ function renderResults() {
     const dc = dnsCheckOf(a); if (dc && dc !== "ok") tdV.appendChild(el("div", "muted", DNS_LABEL[dc] || dc));
     if (a.status === "false" && !a.status_override && a.false_reasons && a.false_reasons.length) {
       const fr = a.false_reasons[0];
-      tdV.appendChild(el("div", "muted", (fr.hidden ? "hidden: " : "") + fr.reason));
+      const r = (fr.hidden ? "hidden: " : "") + fr.reason; const rd = el("div", "muted clamp", r); rd.title = r; tdV.appendChild(rd);
     }
     if ((a.enriched_by || []).length) { const t = el("div", "muted", "+ enrichment"); t.title = "found by a later enrichment: " + a.enriched_by.join(", "); tdV.appendChild(t); }
     if (viaOf(a).length && !isThird(a)) { const t = el("div", "muted via", "via " + viaOf(a).join(", ")); t.title = "found through a related domain promoted into scope, not through the target itself"; tdV.appendChild(t); }
@@ -1333,7 +1504,8 @@ function openAsset(a) {
   } else if ((a.ports || []).length) row("Ports", a.ports.join(", "));
   { const d = el("div"); chips(d, a.sources); row("Sources", d); }
   if (a.contexts && a.contexts.length) {
-    const d = el("div"); a.contexts.forEach((c) => { const x = el("div", "ctx"); x.appendChild(el("b", null, c.module || "—"));
+    // discovery contexts are the sources' own text: not translated
+    const d = el("div"); a.contexts.forEach((c) => { const x = el("div", "ctx"); x.dataset.i18nSkip = ""; x.appendChild(el("b", null, c.module || "—"));
       x.appendChild(document.createTextNode(": " + c.context)); d.appendChild(x); });
     row("How it was found", d);
   }
@@ -1357,7 +1529,8 @@ function renderKeys() {
     const tr = el("tr");
     // the field is almost always api_key; show it only when a module uses another name
     tr.appendChild(el("td", "name", k.field === "api_key" ? k.module : `${k.module} · ${k.field}`));
-    tr.appendChild(el("td", null, (k.desc || "—") + (k.mandatory ? " · required" : " · optional")));
+    { const t = (k.desc || "—") + (k.mandatory ? " · required" : " · optional"); const td = el("td"); const v = el("div", "clamp", t);
+      v.title = t; td.appendChild(v); tr.appendChild(td); }
     const tdV = el("td"); tdV.appendChild(el("span", "st " + (k.set ? "ok" : (k.mandatory ? "nokey" : "none")), k.set ? (k.masked || "set") : "not set"));
     tr.appendChild(tdV);
     const tdA = el("td"); const form = el("div", "keyform");

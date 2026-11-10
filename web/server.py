@@ -65,6 +65,10 @@ VEGA_FILES = {
     "vega-embed.js": BBOT_DOCS / "javascripts" / "vega-embed@6.js",
     "chord.json": BBOT_DOCS / "data" / "chord_graph" / "vega.json",
 }
+I18N_FILES = {
+    "ru.json": (WEB_DIR / "i18n_ru.json", "application/json; charset=utf-8"),
+    "howto_ru.html": (WEB_DIR / "howto_ru.html", "text/html; charset=utf-8"),
+}
 VEGA_TYPES = {"js": "application/javascript; charset=utf-8", "json": "application/json; charset=utf-8"}
 
 
@@ -95,6 +99,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json(build_sources())
             if route == "/api/chord":
                 return self._send_json(build_chord())
+            if route.startswith("/i18n/"):
+                # interface translations: the dictionary and the Russian text of the "How it works" tab
+                name = route[len("/i18n/"):]
+                if name not in I18N_FILES:
+                    return self._send_json({"error": "not found"}, 404)
+                return self._send_file(*I18N_FILES[name])
             if route.startswith("/static/vega/"):
                 # BBoT's documentation bundles (vega, vega-embed, vega-lite) and its chord graph spec, served locally
                 name = route[len("/static/vega/"):]
