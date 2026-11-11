@@ -28,6 +28,8 @@
     --chip: #262b32; --in: #3fc38a; --out: #d98a52; --warn: #e0a64a; --row: #1f242a;
   }
   * { box-sizing: border-box; }
+  /* elements with their own display (grid, flex) must still disappear when hidden */
+  [hidden] { display: none !important; }
   body { margin: 0; font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
     background: var(--bg); color: var(--ink); }
   header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
@@ -93,7 +95,7 @@
   table.fixed td { overflow: hidden; overflow-wrap: anywhere; }
   .clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
   .clamp1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #r-table col.c-type { width: 150px; } #r-table col.c-port { width: 110px; } #r-table col.c-http { width: 90px; }
+  #r-table col.c-type { width: 150px; } #r-table col.c-risk { width: 105px; } #r-table col.c-port { width: 110px; } #r-table col.c-http { width: 90px; }
   #r-table col.c-src { width: 18%; } #r-table col.c-st { width: 15%; } #r-table col.c-seen { width: 140px; }
   #s-table col.c-name { width: 180px; } #s-table col.c-key { width: 125px; } #s-table col.c-fresh { width: 130px; }
   #s-table col.c-st { width: 145px; }
@@ -125,6 +127,44 @@
   .yes { color: var(--warn); font-weight: 600; } .no { color: var(--muted); }
   .st { display: inline-block; font-size: 12px; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
   .st::before { content: "● "; }
+  /* risk of a finding (web/risk.py): what to look at first */
+  :root { --rk-critical: #a43ae0; --rk-high: #d64545; --rk-medium: #d9822b; }
+  .rk { display: inline-block; font-size: 11.5px; font-weight: 650; padding: 2px 9px; border-radius: 999px; white-space: nowrap;
+    text-transform: uppercase; letter-spacing: .03em; }
+  .rk.critical { color: #fff; background: var(--rk-critical); }
+  .rk.high { color: #fff; background: var(--rk-high); }
+  .rk.medium { color: var(--rk-medium); background: color-mix(in srgb, var(--rk-medium) 16%, transparent); }
+  tr.risk-critical > td:first-child { box-shadow: inset 4px 0 0 var(--rk-critical); }
+  tr.risk-high > td:first-child { box-shadow: inset 4px 0 0 var(--rk-high); }
+  tr.risk-medium > td:first-child { box-shadow: inset 4px 0 0 color-mix(in srgb, var(--rk-medium) 70%, transparent); }
+  tbody tr.risk-critical { background: color-mix(in srgb, var(--rk-critical) 7%, transparent); }
+  tbody tr.risk-high { background: color-mix(in srgb, var(--rk-high) 6%, transparent); }
+  .riskline { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .riskline .rk { cursor: pointer; }
+  ul.reasons { margin: 4px 0 0; padding-left: 18px; }
+  /* gowitness screenshots: a gallery of the filtered findings and a preview in the card */
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+  .shot { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; cursor: pointer;
+    display: flex; flex-direction: column; }
+  .shot:hover { border-color: var(--accent); }
+  .shot img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: top; display: block; background: var(--row); }
+  .shot .cap { padding: 8px 10px; display: flex; flex-direction: column; gap: 5px; }
+  .shot .cap .u { font: 12px var(--mono); }
+  .shot .cap .meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .shot.risk-critical { border-color: var(--rk-critical); } .shot.risk-high { border-color: var(--rk-high); }
+  .shotprev img { max-width: 100%; border: 1px solid var(--line); border-radius: 8px; display: block; margin-bottom: 6px; }
+  .btn.on { background: var(--accent-weak); color: var(--accent); border-color: var(--accent); }
+  .shot .cap .code { font: 600 11.5px var(--mono); padding: 1px 7px; border-radius: 6px; background: var(--chip); }
+  .shot .cap .code.c2 { color: var(--in); } .shot .cap .code.c3 { color: var(--accent); }
+  .shot .cap .code.c4, .shot .cap .code.c5 { color: #d64545; }
+  .shot .cap .t { font-size: 12px; color: var(--muted); }
+  /* viewer of one screenshot: full width, prev / next with the arrow keys */
+  dialog.viewer { max-width: min(1600px, 96vw); width: 96vw; padding: 0; }
+  .viewer .vbody { padding: 12px 16px 16px; }
+  .viewer .vimg { display: block; max-width: 100%; max-height: 72vh; margin: 0 auto; border: 1px solid var(--line); border-radius: 8px; }
+  .viewer .vnav { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .viewer .vmeta { margin-top: 10px; display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; font-size: 13px; }
+  .viewer .vmeta dt { color: var(--muted); } .viewer .vmeta dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
   .st.ok { color: var(--in); background: color-mix(in srgb, var(--in) 14%, transparent); }
   .st.valid { color: var(--in); background: color-mix(in srgb, var(--in) 14%, transparent); }
   .st.false { color: #d64545; background: color-mix(in srgb, #d64545 14%, transparent); }
@@ -245,6 +285,7 @@
     <button id="tab-results" class="on">Analysis</button>
     <button id="tab-timeline">Timeline</button>
     <button id="tab-companies">Companies</button>
+    <button id="tab-shots">Screenshots</button>
     <button id="tab-sources">Sources</button>
     <button id="tab-keys">Keys</button>
     <button id="tab-howto">How it works</button>
@@ -297,6 +338,7 @@
       <button class="btn" id="r-report" disabled>Source report</button>
       <button class="btn" id="r-enrich" disabled title="Run new sources over the findings this scan already has">Enrich</button>
       <button class="btn" id="r-export" disabled>Export</button>
+      <button class="btn" id="r-gallery-btn" hidden title="Screenshots of the filtered findings (gowitness)">Screenshots</button>
       <input type="search" id="r-q" placeholder="Search findings…" />
       <input type="search" id="r-port" class="narrow" placeholder="Port: 443, 8000-9000" title="Ports: a list and ranges, e.g. 22,80,443 or 8000-9000" />
       <select id="r-type"><option value="">all types</option></select>
@@ -311,12 +353,19 @@
       <select id="r-http" title="HTTP status code of URLs">
         <option value="">HTTP: any</option>
       </select>
+      <select id="r-risk" title="Risk level (rules: web/risk.json)">
+        <option value="">risk: any</option>
+        <option value="critical">critical</option>
+        <option value="high">high and above</option>
+        <option value="medium">any risk</option>
+      </select>
       <select id="r-owner">
         <option value="">ownership: any</option>
         <option value="own">target assets</option>
         <option value="related">via related domains</option>
         <option value="third">third party</option>
       </select>
+      <span class="riskline" id="r-risks"></span>
       <span class="count" id="r-count"></span>
     </div>
     <div class="job" id="r-job" hidden>
@@ -329,8 +378,10 @@
       </div>
       <pre id="job-log"></pre>
     </div>
-    <div class="tablewrap"><table id="r-table" class="fixed"><colgroup><col class="c-type"><col><col class="c-port"><col class="c-http"><col class="c-src"><col class="c-st"><col class="c-seen"></colgroup><thead><tr>
+    <div class="gallery" id="r-gallery" hidden></div>
+    <div class="tablewrap" id="r-wrap"><table id="r-table" class="fixed"><colgroup><col class="c-type"><col class="c-risk"><col><col class="c-port"><col class="c-http"><col class="c-src"><col class="c-st"><col class="c-seen"></colgroup><thead><tr>
       <th class="sortable" data-k="type">Type</th>
+      <th class="sortable" data-k="risk" title="What to look at first: an open database, a login form, a VPN portal... (rules: web/risk.json)">Risk</th>
       <th class="sortable" data-k="data">Finding</th>
       <th class="sortable num" data-k="port">Port</th>
       <th class="sortable num" data-k="http" title="HTTP status code of a URL (http module)">HTTP</th>
@@ -368,6 +419,24 @@
       <th>Schedules</th><th>Alerts</th><th></th>
     </tr></thead><tbody id="c-body"></tbody></table></div>
     <div class="empty" id="c-empty" hidden>No companies yet. Create one, then start scans for it or attach existing scans.</div>
+  </section>
+
+  <section id="view-shots" hidden>
+    <div class="bar">
+      <select id="g-scan"><option value="">all scans</option></select>
+      <input type="search" id="g-q" placeholder="Search URL or page title…" />
+      <select id="g-code" title="HTTP code the browser got"><option value="">HTTP: any</option></select>
+      <select id="g-status">
+        <option value="">status: any</option>
+        <option value="valid">valid</option>
+        <option value="historical">historical</option>
+        <option value="false">false</option>
+      </select>
+      <span class="count" id="g-count"></span>
+    </div>
+    <div class="gallery" id="g-grid"></div>
+    <div class="empty" id="g-empty" hidden>No screenshots yet. Take them with the <b>gowitness</b> source: choose it in
+      <b>New scan</b>, or open a finished scan in Analysis and run <b>Enrich</b> with gowitness over its URLs.</div>
   </section>
 
   <section id="view-howto" hidden>
@@ -569,6 +638,23 @@
         <span class="muted" id="tg-msg"></span>
       </div>
     </div>
+    <div class="panel" id="px-panel">
+      <h3>Proxy</h3>
+      <div class="hint">All HTTP traffic of the scans goes through it: source APIs, the <code>http</code> module and the
+        gowitness browser - for scans from this UI and from <code>bin/osint</code>. Kept in <code>config/secrets.yml</code>
+        (BBoT's <code>web.http_proxy</code>); the password is never shown. Schemes: http, https, socks5, socks5h.</div>
+      <div class="keyform" style="margin-top:10px">
+        <input type="password" id="px-url" placeholder="http://user:password@host:port" autocomplete="off" />
+        <button class="btn sm primary" id="px-save">Save</button>
+        <button class="btn sm" id="px-test">Test</button>
+        <button class="btn sm danger" id="px-del">Remove</button>
+        <span class="st" id="px-state"></span>
+      </div>
+      <div class="keyform" style="margin-top:8px">
+        <input type="text" id="px-exclude" placeholder="bypass: hosts / CIDRs, comma separated" />
+        <span class="muted" id="px-msg"></span>
+      </div>
+    </div>
     <div class="bar">
       <input type="search" id="k-q" placeholder="Search by source…" />
       <select id="k-state">
@@ -586,6 +672,21 @@
       by the next scan. Values are never sent back to the UI, only a mask.</div>
   </section>
 </main>
+
+<dialog id="dlg-view" class="viewer">
+  <div class="dlg-head"><h2 id="v-title"></h2><button class="x" id="v-x">&times;</button></div>
+  <div class="vbody">
+    <div class="vnav">
+      <button class="btn sm" id="v-prev" title="previous (←)">← Prev</button>
+      <button class="btn sm" id="v-next" title="next (→)">Next →</button>
+      <span class="count" id="v-pos"></span>
+      <a class="btn sm" id="v-full" target="_blank" rel="noopener">Open full size</a>
+      <button class="btn sm" id="v-scan">Open the scan</button>
+    </div>
+    <img class="vimg" id="v-img" alt="" />
+    <dl class="vmeta" id="v-meta"></dl>
+  </div>
+</dialog>
 
 <dialog id="dlg">
   <div class="dlg-head"><h2 id="dlg-name"></h2><button class="x" id="dlg-x">&times;</button></div>
@@ -894,11 +995,12 @@ window.addEventListener("resize", syncHeadHeight);
 
 // ---- tabs ----
 function show(which) {
-  for (const v of ["results", "timeline", "companies", "sources", "keys", "howto"]) {
+  for (const v of ["results", "timeline", "companies", "shots", "sources", "keys", "howto"]) {
     $("#view-" + v).hidden = v !== which;
     $("#tab-" + v).classList.toggle("on", v === which);
   }
-  if (which === "keys") { loadKeys(); loadTelegram(); }
+  if (which === "keys") { loadKeys(); loadTelegram(); loadProxy(); }
+  if (which === "shots") loadShots();
   if (which === "companies") loadCompanies();
   if (which === "timeline") loadCompanies().then(loadTimeline);
   if (which === "howto") loadChord();
@@ -909,8 +1011,10 @@ $("#tab-keys").onclick = () => show("keys");
 $("#tab-timeline").onclick = () => show("timeline");
 $("#tab-companies").onclick = () => show("companies");
 $("#tab-howto").onclick = () => show("howto");
+$("#tab-shots").onclick = () => show("shots");
 if (location.hash === "#timeline") show("timeline");
 if (location.hash === "#howto") show("howto");
+if (location.hash === "#screenshots") show("shots");
 
 // ---- how it works: BBOT's chord graph of modules <-> event types (the same Vega spec, our modules) ----
 let CHORD_DONE = false;
@@ -1032,6 +1136,11 @@ fetch("/api/sources").then((r) => r.json()).then((data) => {
 // default order: findings with more sources first
 let ASSETS = [], rSort = { k: "nsources", dir: -1 };
 const IOC_LABEL = { valid: "valid", historical: "historical", false: "false" };
+const RISK_RANK = { critical: 3, high: 2, medium: 1 };
+const riskBadge = (r) => el("span", "rk " + r, r);
+// /api/screenshot/<scan>/<path inside the scan>
+const shotUrl = (s) => "/api/screenshot/" + encodeURIComponent(s.scan) + "/" + s.path.split("/").map(encodeURIComponent).join("/");
+let GALLERY = false;
 const DNS_LABEL = { ok: "resolves", nxdomain: "does not resolve", dangling: "dangling CNAME", wildcard: "wildcard", error: "DNS error" };
 const dnsCheckOf = (a) => { const t = (a.tags || []).find((x) => x.startsWith("dns-check-")); return t ? t.slice(10) : null; };
 const isThird = (a) => (a.tags || []).includes("third-party");
@@ -1080,7 +1189,7 @@ const viaOf = (a) => a.via || [];
 const ownerOf = (a) => isThird(a) ? "third" : viaOf(a).length ? "related" : "own";
 const IOC_RANK = { valid: 2, historical: 1, false: 0.5 };
 const sortKey = (a, k) => k === "nsources" ? a.sources.length : k === "last_seen" ? (a.last_seen || 0) : k === "status" ? (IOC_RANK[a.status] || 0)
-  : k === "port" ? ((a.ports || [])[0] || 0)
+  : k === "port" ? ((a.ports || [])[0] || 0) : k === "risk" ? (RISK_RANK[a.risk] || 0)
   // findings without a code sort after every code
   : k === "http" ? ((a.http_status || [])[0] || 999) : a[k];
 // "22, 80,443 8000-9000" -> [[22,22],[80,80],[443,443],[8000,9000]]; null - empty, false - not a port list
@@ -1119,20 +1228,27 @@ function renderResults() {
   const ports = parsePorts($("#r-port").value);
   $("#r-port").classList.toggle("bad", ports === false);
   const q = $("#r-q").value.trim().toLowerCase(), type = $("#r-type").value, src = $("#r-source").value, rst = $("#r-status").value, own = $("#r-owner").value;
+  const rk = RISK_RANK[$("#r-risk").value] || 0;
   const rows = ASSETS.filter((a) =>
     (!q || a.data.toLowerCase().includes(q) || (a.hosts || []).some((h) => h.toLowerCase().includes(q)) ||
       (a.type === "TECHNOLOGY" && techLabel(a.data).toLowerCase().includes(q))) &&
     (!ports || portMatch(a, ports)) && typeMatch(a, type) && httpMatch(a, $("#r-http").value) && (!src || a.sources.includes(src)) &&
     (!rst || (a.status || "none") === rst) &&
-    (!own || ownerOf(a) === own));
+    (!own || ownerOf(a) === own) && (!rk || (RISK_RANK[a.risk] || 0) >= rk));
   rows.sort((a, b) => {
     const x = sortKey(a, rSort.k), y = sortKey(b, rSort.k);
     return ((x < y ? -1 : x > y ? 1 : 0) * rSort.dir) || (b.sources.length - a.sources.length) || a.data.localeCompare(b.data);
   });
   body.innerHTML = "";
+  const withShots = ASSETS.some((a) => (a.screenshots || []).length);
+  $("#r-gallery-btn").hidden = !withShots; if (!withShots) GALLERY = false;
+  $("#r-gallery-btn").classList.toggle("on", GALLERY);
+  $("#r-wrap").hidden = GALLERY; $("#r-gallery").hidden = !GALLERY;
+  if (GALLERY) { renderGallery(rows); $("#r-count").textContent = `${$("#r-gallery").children.length} screenshot(s) · ${rows.length} of ${ASSETS.length} findings`; renderRiskCounts(); return; }
   for (const a of rows) {
     const tr = el("tr");
     const tdT = el("td", "type"); tdT.appendChild(el("span", "chip", a.type)); tr.appendChild(tdT);
+    const tdR = el("td"); if (a.risk) { tdR.appendChild(riskBadge(a.risk)); tdR.title = (a.risk_reasons || []).join("\n"); } tr.appendChild(tdR);
     const tdD = el("td", "data"); const label = a.type === "TECHNOLOGY" ? techLabel(a.data) : a.data;
     const val = el("div", "val clamp", label); val.title = label; tdD.appendChild(val);
     if (a.type === "TECHNOLOGY") {
@@ -1165,10 +1281,11 @@ function renderResults() {
     if (isThird(a)) { const t = el("div", "muted", "third party"); t.title = "a provider from the target's DNS records: the relation is current, but it is not a target asset"; tdV.appendChild(t); }
     tr.appendChild(tdV);
     const tdSeen = el("td", "seen", fmtSeen(a.last_seen)); tr.appendChild(tdSeen);
-    tr.className = "click"; tr.onclick = () => openAsset(a);
+    tr.className = "click" + (a.risk ? " risk-" + a.risk : ""); tr.onclick = () => openAsset(a);
     body.appendChild(tr);
   }
   $("#r-count").textContent = `${rows.length} of ${ASSETS.length} findings`;
+  renderRiskCounts();
 }
 let SCAN_COMPANIES = {}, SCAN_COMPANY = "";
 function loadScan(name) {
@@ -1196,7 +1313,114 @@ function loadScan(name) {
   }).catch(() => { $("#r-empty").textContent = "Failed to load the scan."; });
 }
 $("#r-scan").onchange = () => loadScan($("#r-scan").value);
-["r-q", "r-port", "r-type", "r-source", "r-status", "r-http", "r-owner"].forEach((id) => { $("#" + id).oninput = renderResults; });
+// the screenshots of the filtered findings: one tile per URL (the WEBSCREENSHOT rows themselves are not repeated)
+function renderGallery(rows) {
+  const g = $("#r-gallery"); g.innerHTML = "";
+  for (const a of rows) {
+    if (a.type !== "URL" || !(a.screenshots || []).length) continue;
+    const s = a.screenshots[0];
+    const tile = el("div", "shot" + (a.risk ? " risk-" + a.risk : ""));
+    const img = el("img"); img.loading = "lazy"; img.src = shotUrl(s); img.alt = a.data; tile.appendChild(img);
+    const cap = el("div", "cap");
+    const u = el("div", "u clamp1", a.data); u.title = a.data; cap.appendChild(u);
+    const meta = el("div", "meta");
+    if (a.risk) meta.appendChild(riskBadge(a.risk));
+    meta.appendChild(el("span", "st " + (a.status || "none"), IOC_LABEL[a.status] || "—"));
+    if (s.status_code) meta.appendChild(codeChip(s.status_code));
+    else if ((a.http_status || []).length) meta.appendChild(httpChips(a, false));
+    cap.appendChild(meta);
+    if (s.title) { const t = el("div", "t clamp1", s.title); t.title = s.title; cap.appendChild(t); }
+    tile.appendChild(cap);
+    tile.onclick = () => openAsset(a);
+    g.appendChild(tile);
+  }
+  if (!g.children.length) g.appendChild(el("div", "empty", "No screenshots among the filtered findings."));
+}
+$("#r-gallery-btn").onclick = () => { GALLERY = !GALLERY; renderResults(); };
+// the code the browser got for a screenshot (after redirects)
+const codeChip = (c) => { const x = el("span", "code c" + String(c)[0], String(c)); x.title = "HTTP code the browser got"; return x; };
+
+// ---------- all screenshots (every scan) ----------
+let SHOTS = { scans: [], shots: [] }, SHOTS_VIEW = [], SHOT_I = 0;
+function loadShots() {
+  const cur = $("#g-scan").value;
+  fetch("/api/screenshots").then((r) => r.json()).then((d) => {
+    SHOTS = d;
+    const roots = [...new Set(d.shots.map((s) => s.root))].sort();
+    const sel = $("#g-scan"); sel.innerHTML = ""; sel.appendChild(new Option("all scans", ""));
+    roots.forEach((r) => sel.appendChild(new Option(`${r} (${d.shots.filter((s) => s.root === r).length})`, r)));
+    sel.value = roots.includes(cur) ? cur : "";
+    const codes = [...new Set(d.shots.map((s) => s.status_code).filter(Boolean))].sort();
+    const cs = $("#g-code"), cc = cs.value; cs.innerHTML = ""; cs.appendChild(new Option("HTTP: any", ""));
+    codes.forEach((c) => cs.appendChild(new Option(String(c), String(c)))); cs.value = codes.map(String).includes(cc) ? cc : "";
+    renderShots();
+  }).catch((e) => { $("#g-count").textContent = "Failed to load: " + e.message; });
+}
+function renderShots() {
+  const g = $("#g-grid"); g.innerHTML = "";
+  const scan = $("#g-scan").value, q = $("#g-q").value.trim().toLowerCase(), code = $("#g-code").value, st = $("#g-status").value;
+  SHOTS_VIEW = SHOTS.shots.filter((s) => (!scan || s.root === scan) && (!code || String(s.status_code) === code) &&
+    (!st || s.status === st) && (!q || [s.url, s.page, s.title].some((x) => (x || "").toLowerCase().includes(q))));
+  SHOTS_VIEW.forEach((s, i) => {
+    const tile = el("div", "shot");
+    const img = el("img"); img.loading = "lazy"; img.src = shotUrl(s); img.alt = s.url || ""; tile.appendChild(img);
+    const cap = el("div", "cap");
+    const u = el("div", "u clamp1", s.page || s.url); u.title = s.page + (s.url !== s.page ? "\n→ " + s.url : ""); cap.appendChild(u);
+    const meta = el("div", "meta");
+    if (s.status_code) meta.appendChild(codeChip(s.status_code));
+    if (s.status) meta.appendChild(el("span", "st " + s.status, IOC_LABEL[s.status] || s.status));
+    if (!scan) meta.appendChild(el("span", "muted", s.root));
+    cap.appendChild(meta);
+    if (s.title) { const t = el("div", "t clamp1", s.title); t.title = s.title; cap.appendChild(t); }
+    tile.appendChild(cap);
+    tile.onclick = () => openViewer(i);
+    g.appendChild(tile);
+  });
+  $("#g-empty").hidden = SHOTS.shots.length > 0;
+  $("#g-count").textContent = SHOTS.shots.length ? `${SHOTS_VIEW.length} of ${SHOTS.shots.length} screenshots` : "";
+}
+["g-scan", "g-q", "g-code", "g-status"].forEach((id) => { $("#" + id).oninput = renderShots; });
+function openViewer(i) {
+  if (!SHOTS_VIEW.length) return;
+  SHOT_I = (i + SHOTS_VIEW.length) % SHOTS_VIEW.length;
+  const s = SHOTS_VIEW[SHOT_I];
+  $("#v-title").textContent = s.page || s.url;
+  $("#v-img").src = shotUrl(s); $("#v-img").alt = s.url || "";
+  $("#v-full").href = shotUrl(s);
+  $("#v-pos").textContent = `${SHOT_I + 1} / ${SHOTS_VIEW.length}`;
+  const m = $("#v-meta"); m.innerHTML = "";
+  const row = (k, v) => { if (v == null || v === "") return; m.appendChild(el("dt", null, k)); const d = el("dd"); d.dataset.i18nSkip = ""; d.textContent = v; m.appendChild(d); };
+  row("Visited", s.page); if (s.url !== s.page) row("Ended at", s.url);
+  row("HTTP code", s.status_code ? String(s.status_code) + (s.code_from === "http" ? " (first answer, before redirects)" : "") : "—");
+  row("Page title", s.title);
+  row("Status", s.status || "—"); row("Scan", s.scan + (s.scan !== s.root ? ` (enrichment of ${s.root})` : ""));
+  if (s.at) row("Taken", fmtSeen(s.at));
+  if (!$("#dlg-view").open) $("#dlg-view").showModal();
+}
+$("#v-prev").onclick = () => openViewer(SHOT_I - 1);
+$("#v-next").onclick = () => openViewer(SHOT_I + 1);
+$("#v-x").onclick = () => $("#dlg-view").close();
+$("#v-scan").onclick = () => {
+  const s = SHOTS_VIEW[SHOT_I]; $("#dlg-view").close(); show("results");
+  const sel = $("#r-scan"); sel.value = s.root; sel.dispatchEvent(new Event("change"));
+};
+document.addEventListener("keydown", (ev) => {
+  if (!$("#dlg-view").open) return;
+  if (ev.key === "ArrowLeft") { ev.preventDefault(); openViewer(SHOT_I - 1); }
+  if (ev.key === "ArrowRight") { ev.preventDefault(); openViewer(SHOT_I + 1); }
+});
+// risk counts of the whole scan; a click filters by the level
+function renderRiskCounts() {
+  const box = $("#r-risks"); box.innerHTML = "";
+  const c = { critical: 0, high: 0, medium: 0 }; ASSETS.forEach((a) => { if (a.risk in c) c[a.risk]++; });
+  for (const r of ["critical", "high", "medium"]) {
+    if (!c[r]) continue;
+    const b = riskBadge(r); b.textContent = `${r} ${c[r]}`; b.title = `show ${r} findings`;
+    b.onclick = () => { $("#r-risk").value = r; renderResults(); };
+    box.appendChild(b);
+  }
+}
+["r-q", "r-port", "r-type", "r-source", "r-status", "r-http", "r-owner", "r-risk"].forEach((id) => { $("#" + id).oninput = renderResults; });
 document.querySelectorAll("#r-table th.sortable").forEach((th) => th.onclick = () => {
   const k = th.dataset.k; rSort.dir = (rSort.k === k) ? -rSort.dir : 1; rSort.k = k; renderResults();
 });
@@ -1485,6 +1709,20 @@ function openAsset(a) {
   const dc = dnsCheckOf(a); if (dc) st.appendChild(document.createTextNode(" DNS: " + (DNS_LABEL[dc] || dc)));
   if (isThird(a)) st.appendChild(document.createTextNode(" · third party"));
   row("Status", st);
+  if (a.risk) {
+    const d = el("div"); d.appendChild(riskBadge(a.risk));
+    const ul = el("ul", "reasons"); (a.risk_reasons || []).forEach((r) => ul.appendChild(el("li", null, r))); d.appendChild(ul);
+    row("Risk", d);
+  }
+  if ((a.screenshots || []).length) {
+    const d = el("div", "shotprev");
+    // one per page actually shown: gowitness may reach the same final URL over two ports
+    const seen = new Set(); a.screenshots.filter((s) => !seen.has(s.url) && seen.add(s.url)).forEach((s) => { const link = el("a"); link.href = shotUrl(s); link.target = "_blank"; link.rel = "noopener";
+      link.title = "open full size"; const img = el("img"); img.loading = "lazy"; img.src = shotUrl(s); img.alt = s.url;
+      link.appendChild(img); d.appendChild(link);
+      if (s.url !== a.data) d.appendChild(el("div", "muted", "→ " + s.url)); });
+    row("Screenshot", d);
+  }
   if ((a.enriched_by || []).length) row("Found by enrichment", a.enriched_by.join(", "));
   if (viaOf(a).length) row("Via related domain", viaOf(a).join(", ") + " (promoted into scope by related_domains)");
   if (a.false_reasons && a.false_reasons.length) {
@@ -2011,8 +2249,10 @@ function renderTimeline() {
     if (list.length) {
       const wrap = el("div", "tablewrap"); const t = el("table"); const tb = el("tbody");
       for (const e of list) {
-        const tr = el("tr");
-        const tdT = el("td", "type"); tdT.appendChild(el("span", "chip", e.type)); tr.appendChild(tdT);
+        const tr = el("tr", e.risk ? "risk-" + e.risk : null);
+        const tdT = el("td", "type"); tdT.appendChild(el("span", "chip", e.type));
+        if (e.risk) { const b = riskBadge(e.risk); b.title = (e.risk_reasons || []).join("\n"); b.style.marginLeft = "6px"; tdT.appendChild(b); }
+        tr.appendChild(tdT);
         const tdD = el("td", "data", e.data); if (e.details && e.details.description) tdD.appendChild(el("div", "muted desc", e.details.description.slice(0, 200))); tr.appendChild(tdD);
         const tdS = el("td"); chips(tdS, e.sources); tr.appendChild(tdS);
         tr.appendChild(el("td", "muted", (e.kind === "baseline" ? "baseline" : "new") + (e.third_party ? " · third party" : "")));
@@ -2034,6 +2274,24 @@ function renderTelegram(d) {
   $("#tg-token-state").textContent = d.token_set ? `token ${d.token_masked}` : "no token";
   $("#tg-chat").value = d.chat_id || "";
 }
+function renderProxy(d) {
+  $("#px-state").className = "st " + (d.set ? "ok" : "none");
+  $("#px-state").textContent = d.set ? `proxy ${d.masked}` : "no proxy: direct connections";
+  // the masked proxy URL is data, not UI text
+  if (d.set) $("#px-state").dataset.i18nSkip = ""; else delete $("#px-state").dataset.i18nSkip;
+  $("#px-exclude").value = (d.exclude || []).join(", ");
+}
+function loadProxy() { fetch("/api/proxy").then((r) => r.json()).then(renderProxy).catch(() => {}); }
+$("#px-save").onclick = () => postJSON("/api/proxy/save", { url: $("#px-url").value.trim(), exclude: $("#px-exclude").value })
+  .then((d) => { renderProxy(d); $("#px-url").value = ""; $("#px-msg").textContent = "saved: the next scan uses it"; })
+  .catch((e) => { $("#px-msg").textContent = e.message; });
+$("#px-del").onclick = () => { if (!confirm("Remove the proxy? Scans will connect directly.")) return;
+  postJSON("/api/proxy/delete", {}).then((d) => { renderProxy(d); $("#px-msg").textContent = "removed"; })
+    .catch((e) => { $("#px-msg").textContent = e.message; }); };
+$("#px-test").onclick = () => { $("#px-msg").textContent = "testing…";
+  fetch("/api/proxy/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: $("#px-url").value.trim() }) })
+    .then((r) => r.json()).then((d) => { $("#px-msg").textContent = (d.ok ? "✓ " : "✗ ") + (d.detail || d.error || ""); })
+    .catch((e) => { $("#px-msg").textContent = e.message; }); };
 function loadTelegram() { fetch("/api/telegram").then((r) => r.json()).then(renderTelegram).catch(() => {}); }
 const tgSave = (body, msg) => postJSON("/api/telegram/save", body).then((d) => { renderTelegram(d); $("#tg-msg").textContent = msg; })
   .catch((e) => { $("#tg-msg").textContent = e.message; });

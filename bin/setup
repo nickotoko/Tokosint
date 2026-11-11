@@ -183,6 +183,11 @@ for req in sys.argv[1:]:
 }
 check "module Python packages (${#MODULE_PIP[@]}: ${MODULE_PIP[*]-none})" "pip_ok" "re-run bin/setup"
 check "trufflehog" "command -v trufflehog" "brew install trufflehog (trufflehog module)"
+# optional: screenshots (gowitness module, run explicitly or as an enrichment). It also needs Chrome / Chromium.
+check "gowitness (optional, screenshots)" "command -v gowitness || [ -x \"\$HOME/.bbot/tools/gowitness\" ]" \
+  "go install github.com/sensepost/gowitness@latest, or a release binary from github.com/sensepost/gowitness/releases into ~/.bbot/tools/gowitness"
+check "Chrome (optional, for gowitness)" "[ -x \"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" ] || command -v chromium || command -v google-chrome || [ -d \"\$HOME/.bbot/tools/chrome-mac\" ]" \
+  "install Google Chrome"
 check "HTTPS through blasthttp" "https_ok" "see the error above"
 check "git" "command -v git" "xcode-select --install (git_clone module)"
 check "7z" "command -v 7z" "brew install p7zip (unarchive)"

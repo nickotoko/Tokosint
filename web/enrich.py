@@ -13,6 +13,7 @@ discovery chain of an enriched finding continues the chain of the seed in the pa
 the same company: its new findings get to the timeline and alerts like any other scan.
 """
 
+import ipaddress
 import json
 import time
 from collections import Counter
@@ -106,10 +107,14 @@ def plan(parent, modules, preloaded):
     seeds.sort(key=lambda f: (f["status"] != "valid", f["type"], f["data"]))
     truncated = max(0, len(seeds) - MAX_SEEDS)
     seeds = seeds[:MAX_SEEDS]
+    # addresses that were in scope in the original scan (resolved from its names): the enrichment's scope has only
+    # the target names, so a seed on a bare IP (http://1.2.3.4/) would otherwise be out of scope and dropped
+    in_scope_ips = sorted({h for f in seeds if "in-scope" in (f.get("tags") or []) for h in f.get("hosts") or []
+                           if _is_ip(h)})  # fmt: skip
     return {
         "parent": parent,
         "modules": list(modules),
-        "targets": sorted(set(targets) | set(promoted)),
+        "targets": sorted(set(targets) | set(promoted)) + [ip for ip in in_scope_ips if ip not in targets],
         "seeds": [f["data"] for f in seeds],
         "seed_status": {f["data"]: status[f["data"]] for f in seeds},
         "by_type": dict(Counter(f["type"] for f in seeds)),
@@ -117,6 +122,14 @@ def plan(parent, modules, preloaded):
         "consumes": sorted(consumed_types(modules, preloaded)),
         "truncated": truncated,
     }
+
+
+def _is_ip(host):
+    try:
+        ipaddress.ip_address(str(host).strip("[]"))
+        return True
+    except ValueError:
+        return False
 
 
 def summary(p):

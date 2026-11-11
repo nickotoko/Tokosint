@@ -24,6 +24,9 @@ Routes:
   GET /api/telegram         Telegram settings (token masked)
   POST /api/telegram/save   {"token"?, "chat_id"?}
   POST /api/telegram/test   {"chat_id"?} - send a test message
+  GET /api/proxy            proxy of the scans (web.http_proxy in secrets.yml; masked)
+  POST /api/proxy/save      {"url"?, "exclude"?}; POST /api/proxy/delete; POST /api/proxy/test {"url"?}
+  GET /api/screenshots      every gowitness screenshot (?scan= one scan with its enrichments)
   GET /api/chain/<name>?type=&data=  every discovery chain of a finding (seed -> ... -> finding, with statuses)
   GET /api/enrich/<name>?modules=a,b  what enriching a finished scan with these sources would send (seeds, scope)
   POST /api/enrich/<name>   {"modules": [...]} - run the sources over the scan's findings (web/enrich.py)
@@ -56,6 +59,8 @@ import store  # noqa: E402
 import overrides  # noqa: E402
 import enrich  # noqa: E402
 import quota  # noqa: E402
+import risk  # noqa: E402
+import proxy  # noqa: E402
 from bbot.core.modules import MODULE_LOADER  # noqa: E402
 
 BBOT_DOCS = ROOT / "bbot" / "docs"
@@ -111,6 +116,14 @@ class Handler(BaseHTTPRequestHandler):
                 if name not in VEGA_FILES:
                     return self._send_json({"error": "not found"}, 404)
                 return self._send_file(VEGA_FILES[name], VEGA_TYPES[name.rsplit(".", 1)[-1]])
+            if route.startswith("/api/screenshot/"):
+                # /api/screenshot/<scan>/<path inside the scan>: a gowitness image (see scans.screenshot_file)
+                rest = unquote(route[len("/api/screenshot/"):])
+                scan, _, rel = rest.partition("/")
+                f = scans.screenshot_file(scan, rel)
+                if f is None:
+                    return self._send_json({"error": "not found"}, 404)
+                return self._send_file(f, scans.SCREENSHOT_TYPES[f.suffix.lower()])
             if route == "/api/health":
                 return self._send_json(health.load())
             if route == "/api/scans":
@@ -131,7 +144,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json(out)
             if route.startswith("/api/timeline/"):
                 cid = int(route[len("/api/timeline/"):])
-                return self._send_json(store.timeline(cid, kind=query.get("kind"), type_=query.get("type")))
+                tl = store.timeline(cid, kind=query.get("kind"), type_=query.get("type"))
+                risk.annotate(tl["events"])
+                return self._send_json(tl)
             if route == "/api/cron":
                 try:
                     expr = cronexpr.validate(query.get("expr", ""))
@@ -148,6 +163,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json(store.override_log())
             if route == "/api/telegram":
                 return self._send_json(notify.settings_view())
+            if route == "/api/proxy":
+                return self._send_json(proxy.view())
+            if route == "/api/screenshots":
+                return self._send_json(scans.list_screenshots(query.get("scan") or None))
             if route.startswith("/api/report/"):
                 producers = {s["name"] for s in build_sources() if s["produced_events"]}
                 report = scans.scan_report(unquote(route[len("/api/report/"):]), producers)
@@ -165,7 +184,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self._send_json({"error": "scan not found"}, 404)
                 name = unquote(route[len("/api/scan/"):])
                 # the scan together with its enrichments (new sources run over its findings later)
-                return self._send_json(overrides.apply(name, scans.aggregate_scan(path, include_enrichments=True)))
+                return self._send_json(risk.annotate(overrides.apply(name, scans.aggregate_scan(path, include_enrichments=True))))
             if route.startswith("/api/enrich/"):
                 name = unquote(route[len("/api/enrich/"):])
                 modules = [m for m in str(query.get("modules", "")).split(",") if m]
@@ -232,6 +251,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json({"ok": True})
             if route == "/api/status/set":
                 return self._send_json(overrides.set_status(payload))
+            if route == "/api/proxy/save":
+                return self._send_json(proxy.save(payload))
+            if route == "/api/proxy/delete":
+                return self._send_json(proxy.delete())
+            if route == "/api/proxy/test":
+                res = proxy.test(payload)
+                return self._send_json(res, 200 if res["ok"] else 502)
             if route == "/api/telegram/save":
                 return self._send_json(notify.save_settings(payload))
             if route == "/api/telegram/test":
@@ -246,7 +272,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json(apikeys.list_secrets(MODULE_LOADER.preloaded()))
             if route.startswith("/api/jobs/") and route.endswith("/stop"):
                 return self._send_json(scans.stop_scan(unquote(route[len("/api/jobs/"):-len("/stop")])))
-        except (scans.ScanError, apikeys.SecretError, store.StoreError) as e:
+        except (scans.ScanError, apikeys.SecretError, store.StoreError, proxy.ProxyError) as e:
             return self._send_json({"error": str(e)}, e.code)
         except cronexpr.CronError as e:  # a ValueError: must be caught before "invalid JSON"
             return self._send_json({"error": f"cron: {e}"}, 400)

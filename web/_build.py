@@ -12,6 +12,10 @@ from bbot.core.modules import MODULE_LOADER
 WEB_DIR = Path(__file__).resolve().parent
 
 
+# http - live checks of URLs; gowitness - screenshots of the target's pages (both visit the target)
+ACTIVE_SOURCES = ("http", "gowitness")
+
+
 def build_sources():
     preloaded = MODULE_LOADER.preloaded()
     quotas = json.loads((WEB_DIR / "quotas.json").read_text())
@@ -21,8 +25,9 @@ def build_sources():
         if meta.get("type") != "scan":
             continue
         flags = meta.get("flags", [])
-        # sources = passive modules plus http (kept as the one deliberate exception)
-        if "passive" not in flags and name != "http":
+        # sources = passive modules plus the deliberate active exceptions (they are only run when chosen explicitly:
+        # an empty module list runs the passive set)
+        if "passive" not in flags and name not in ACTIVE_SOURCES:
             continue
         m = meta.get("meta", {})
         mandatory = meta.get("options_mandatory", []) or []

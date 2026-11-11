@@ -256,6 +256,8 @@
   "Could not draw the graph: ": "Не удалось нарисовать граф: ",
   "owner not verified": "владелец не подтверждён",
   "descendant of a false finding": "потомок ложной находки",
+  " [re-validated, T-037]": " [перепроверено]",
+  "[re-validated, T-037]": "[перепроверено]",
   " [re-validated]": " [перепроверено]",
   "[re-validated]": "[перепроверено]",
   "Edit": "Изменить",
@@ -309,7 +311,46 @@
   "requests / hour": "запросы / час",
   "searches": "поиски",
   "credits": "кредиты",
-  "requests": "запросы"
+  "requests": "запросы",
+  "Risk": "Риск",
+  "risk: any": "риск: любой",
+  "critical": "критичный",
+  "high": "высокий",
+  "medium": "средний",
+  "high and above": "высокий и выше",
+  "any risk": "любой риск",
+  "What to look at first: an open database, a login form, a VPN portal... (rules: web/risk.json)": "Что смотреть первым: открытая БД, форма логина, VPN-портал… (правила: web/risk.json)",
+  "Risk level (rules: web/risk.json)": "Уровень риска (правила: web/risk.json)",
+  "historical: may no longer be exposed": "исторический: возможно, уже не доступно",
+  "Screenshots": "Скриншоты",
+  "Screenshot": "Скриншот",
+  "open full size": "открыть в полном размере",
+  "Screenshots of the filtered findings (gowitness)": "Скриншоты отфильтрованных находок (gowitness)",
+  "No screenshots among the filtered findings.": "Среди отфильтрованных находок нет скриншотов.",
+  "all scans": "все сканы",
+  "Search URL or page title…": "Поиск по URL или заголовку…",
+  "HTTP code the browser got": "HTTP-код, который получил браузер",
+  "← Prev": "← Назад",
+  "Next →": "Вперёд →",
+  "previous (←)": "предыдущий (←)",
+  "next (→)": "следующий (→)",
+  "Open full size": "Открыть в полном размере",
+  "Open the scan": "Открыть скан",
+  "Visited": "Открыт",
+  "Ended at": "Итоговый адрес",
+  "HTTP code": "HTTP-код",
+  "Page title": "Заголовок страницы",
+  "Scan": "Скан",
+  "Taken": "Снят",
+  "Proxy": "Прокси",
+  "Test": "Проверить",
+  "Remove": "Удалить",
+  "testing…": "проверка…",
+  "no proxy: direct connections": "прокси нет: прямые соединения",
+  "saved: the next scan uses it": "сохранено: следующий скан пойдёт через него",
+  "removed": "удалено",
+  "Remove the proxy? Scans will connect directly.": "Удалить прокси? Сканы будут ходить напрямую.",
+  "bypass: hosts / CIDRs, comma separated": "в обход прокси: хосты / CIDR через запятую"
  },
  "patterns": [
   [
@@ -707,6 +748,26 @@
   [
    "DNS check of names: (.*)",
    "DNS-проверка имён: $1"
+  ],
+  [
+   "^(critical|high|medium) (\\d+)$",
+   "$1 $2"
+  ],
+  [
+   "^show (critical|high|medium) findings$",
+   "показать: $1"
+  ],
+  [
+   "^(\\d+) screenshot\\(s\\) · (\\d+) of (\\d+) findings$",
+   "$1 скриншот(ов) · $2 из $3 находок"
+  ],
+  [
+   "^(\\d+) of (\\d+) screenshots$",
+   "$1 из $2 скриншотов"
+  ],
+  [
+   "^(\\d{3}) \\(first answer, before redirects\\)$",
+   "$1 (первый ответ, до редиректов)"
   ]
  ]
 }

@@ -102,3 +102,20 @@ def test_merged_view_and_chain(tmp_env):
     assert c[-1]["scan"] == "base-enrich-1" and "scan" not in c[0]
     # scan list marks the enrichment
     assert {s["name"]: s["enrich_of"] for s in scans.list_scans()}["base-enrich-1"] == "base"
+
+
+def test_in_scope_ips_of_seeds_join_the_scope(tmp_env):
+    from test_findings import ev
+
+    gw = {"gowitness": {"watched_events": ["URL", "SOCIAL"], "produced_events": ["WEBSCREENSHOT"]}}
+    out = ["freshness-current", "validity-valid"]
+    write_scan(tmp_env, "base", [
+        ev("U:1", "URL", "http://192.0.2.10/", module="http", host="192.0.2.10", tags=VALID),
+        ev("U:2", "URL", "https://www.acme.example/", module="http", host="www.acme.example", tags=VALID),
+        # an address that was not in scope stays out of it
+        ev("U:3", "URL", "http://198.51.100.7/", module="http", host="198.51.100.7", tags=out),
+    ])  # fmt: skip
+    p = enrich.plan("base", ["gowitness"], gw)
+    assert "http://192.0.2.10/" in p["seeds"]
+    assert "192.0.2.10" in p["targets"] and "198.51.100.7" not in p["targets"]
+    assert "acme.example" in p["targets"]

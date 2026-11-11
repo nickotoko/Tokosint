@@ -1304,6 +1304,15 @@ class excavate(BaseInternalModule, BaseInterceptModule):
         async def process(self, yara_results, event, yara_rule_settings, discovery_context):
             if yara_results:
                 event.add_tag("login-page")
+                # the tag sits on HTTP_RESPONSE, which scans usually omit from the output: report a FINDING too,
+                # so the login form survives into the results (one per page)
+                event_data = {
+                    "name": "Login page",
+                    "description": "Login page: a form with username and password fields",
+                    "severity": "INFO",
+                    "confidence": "MEDIUM",
+                }
+                await self.report(event_data, event, yara_rule_settings, discovery_context, event_type="FINDING")
 
     class DirectoryListingExtractor(ExcavateRule):
         description = "Detects directory listing pages from web servers."

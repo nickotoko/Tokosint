@@ -14,6 +14,7 @@ from datetime import datetime
 
 import cronexpr
 import notify
+import risk
 import scans
 import store
 
@@ -67,7 +68,7 @@ def _ingest(name, alert):
         return None
     import overrides  # overrides imports this module
 
-    findings = overrides.apply(name, scans.aggregate_scan(path, with_false=False))
+    findings = risk.annotate(overrides.apply(name, scans.aggregate_scan(path, with_false=False)))
     result = store.ingest(name, findings, scans.scan_started_at(path))
     if alert:
         company = store.get_company(result["company_id"])

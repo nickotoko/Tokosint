@@ -1,27 +1,28 @@
-# scan results and target data
+# данные реальных целей и результаты сканов
 scans/
+docs/private/
 *.xlsx
 
-# API keys
+# ключи API
 config/secrets.yml
 config/secrets.pending.yml
-*.tmp
 
-# environment and caches
+# история форка bbot (upstream) и сторонние клоны
+.bbot-upstream.git/
+theHarvester/
+
+# окружение и мусор
 .venv/
 __pycache__/
 *.pyc
-.ruff_cache/
-.pytest_cache/
-web/.benchmarks/
 .DS_Store
 pytest_debug.log
 .coverage*
 
-# generated health check result
+# генерируемый результат хелчека
 web/health.json
 
-# Tokosint state: companies, timeline, Telegram bot token
+# Tokosint state: companies, timeline, Telegram token (target data)
 data/
 
 # CA bundle exported from the macOS keychains on networks that intercept TLS (bin/setup)

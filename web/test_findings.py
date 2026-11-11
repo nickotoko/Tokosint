@@ -287,3 +287,62 @@ def test_url_http_status(tmp_env):
     assert f["http://acme.example/"]["http_status"] == [301]
     assert f["http://acme.example/"]["details"]["redirect_location"] == "https://acme.example/"
     assert f["https://acme.example/"]["http_status"] == [200]
+
+
+def test_screenshots_go_to_the_url_and_are_served_safely(tmp_env):
+    shot = ev("W:1", "WEBSCREENSHOT", data_json={"path": "gowitness/screenshots/login.jpeg",
+              "url": "https://www.acme.example:8443/login"}, parent="U:1", module="gowitness")  # fmt: skip
+    d = write_scan(tmp_env, "s1", [*BASE_EVENTS, shot])
+    (d / "gowitness" / "screenshots").mkdir(parents=True)
+    (d / "gowitness" / "screenshots" / "login.jpeg").write_bytes(b"\xff\xd8\xff")
+    (d / "output.json.bak").write_text("secret")
+    found = {(f["type"], f["data"]): f for f in scans.aggregate_scan(d / "output.json")}
+    want = [{"scan": "s1", "path": "gowitness/screenshots/login.jpeg", "url": "https://www.acme.example:8443/login",
+             "status_code": None, "title": None}]
+    assert found[("URL", "https://www.acme.example:8443/login")]["screenshots"] == want
+    assert found[("DNS_NAME", "www.acme.example")]["screenshots"] == []
+    # only images inside the scan's screenshots folder
+    assert scans.screenshot_file("s1", "gowitness/screenshots/login.jpeg") is not None
+    for scan, rel in [("s1", "output.json"), ("s1", "output.json.bak"), ("s1", "gowitness/screenshots/../../output.json"),
+                      ("..", "s1/gowitness/screenshots/login.jpeg"), ("s1", "gowitness/screenshots/missing.png"),
+                      ("s1", "/etc/passwd"), ("", "x.jpeg")]:  # fmt: skip
+        assert scans.screenshot_file(scan, rel) is None, (scan, rel)
+
+
+def test_screenshot_list_across_scans_and_codes(tmp_env):
+    url = ev("U:9", "URL", "http://acme.example/", parent="D:1", module="http", host="acme.example",
+             tags=TAGS + ["status-301"])  # fmt: skip
+    shot = ev("W:9", "WEBSCREENSHOT", data_json={"path": "gowitness/screenshots/a.jpeg", "url": "https://acme.example/",
+              "status_code": 403, "title": "Forbidden"}, parent="U:9", module="gowitness")  # fmt: skip
+    broken = ev("W:8", "WEBSCREENSHOT", data_json={"path": "gowitness/screenshots", "url": "https://b.acme.example/"},
+                parent="U:9", module="gowitness")  # fmt: skip
+    write_scan(tmp_env, "base", BASE_EVENTS)
+    d = write_scan(tmp_env, "base-enrich-1", [url, shot, broken])
+    (d / "enrich.json").write_text(json.dumps({"parent": "base"}))
+    (d / "gowitness" / "screenshots").mkdir(parents=True)
+    (d / "gowitness" / "screenshots" / "a.jpeg").write_bytes(b"\xff\xd8\xff")
+    every = scans.list_screenshots()
+    # the folder-only path of a failed shot is not listed
+    assert len(every["shots"]) == 1
+    s = every["shots"][0]
+    assert (s["scan"], s["root"], s["page"], s["url"], s["status_code"]) == (
+        "base-enrich-1", "base", "http://acme.example/", "https://acme.example/", 403)
+    assert s["code_from"] == "browser"
+    assert every["scans"] == [{"name": "base-enrich-1", "root": "base", "count": 1}]
+    # asked for the original scan: its enrichments' screenshots come with it
+    assert len(scans.list_screenshots("base")["shots"]) == 1
+    found = {(f["type"], f["data"]): f for f in scans.aggregate_scan(d / "output.json")}
+    assert found[("WEBSCREENSHOT", "https://acme.example/")]["http_status"] == [403]
+    assert found[("URL", "http://acme.example/")]["screenshots"][0]["status_code"] == 403
+
+
+def test_old_screenshot_takes_the_code_of_its_url(tmp_env):
+    url = ev("U:9", "URL", "http://acme.example/", parent="D:1", module="http", host="acme.example",
+             tags=TAGS + ["status-301"])  # fmt: skip
+    shot = ev("W:9", "WEBSCREENSHOT", data_json={"path": "gowitness/screenshots/a.jpeg", "url": "https://acme.example/"},
+              parent="U:9", module="gowitness")  # fmt: skip
+    d = write_scan(tmp_env, "old", [url, shot])
+    (d / "gowitness" / "screenshots").mkdir(parents=True)
+    (d / "gowitness" / "screenshots" / "a.jpeg").write_bytes(b"\xff\xd8\xff")
+    s = scans.list_screenshots()["shots"][0]
+    assert (s["status_code"], s["code_from"]) == (301, "http")

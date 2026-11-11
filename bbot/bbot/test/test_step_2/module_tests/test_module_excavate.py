@@ -2186,3 +2186,30 @@ class TestContentDedupWithURLEvents(ModuleTestBase):
             "Both duplicate-content URLs were processed — content dedup failed for URL events"
         )
         assert len(consumer._content_dup_tracker) > 0, "Content dedup tracker should have entries"
+
+
+class TestExcavateLoginPage(ModuleTestBase):
+    """A login form is reported as a FINDING: the login-page tag alone sits on HTTP_RESPONSE, which scans omit."""
+
+    targets = [f"{HTTPSERVER_URL}/"]
+    modules_overrides = ["excavate", "http"]
+
+    async def setup_after_prep(self, module_test):
+        form = (
+            '<form method="POST" action="/auth"><input name="username"><input type="password" name="password"></form>'
+        )
+        module_test.set_expect_requests({"uri": "/"}, {"response_data": form})
+
+    def check(self, module_test, events):
+        findings = [e for e in events if e.type == "FINDING" and e.data.get("name") == "Login page"]
+        assert len(findings) == 1, findings
+        assert findings[0].data["url"] == f"{HTTPSERVER_URL}/"
+        assert any(e.type == "HTTP_RESPONSE" and "login-page" in e.tags for e in events)
+
+
+class TestExcavateNoLoginPage(TestExcavateLoginPage):
+    async def setup_after_prep(self, module_test):
+        module_test.set_expect_requests({"uri": "/"}, {"response_data": '<form><input name="q"></form>'})
+
+    def check(self, module_test, events):
+        assert not any(e.type == "FINDING" and e.data.get("name") == "Login page" for e in events)

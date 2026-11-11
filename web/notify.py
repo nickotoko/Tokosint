@@ -63,15 +63,27 @@ def send(text, chat_id=None):
         return False, type(e).__name__
 
 
+RISK_MARK = {"critical": "🟪", "high": "🟥", "medium": "🟧"}
+RISK_RANK = {"critical": 0, "high": 1, "medium": 2}
+
+
 def format_summary(company, scan, findings, base_url=""):
     by_type = Counter(f["type"] for f in findings)
+    by_risk = Counter(f.get("risk") for f in findings if f.get("risk"))
     head = f"<b>Tokosint · {html.escape(company['name'])}</b>\n"
     head += f"{len(findings)} new valid finding(s) in scan <code>{html.escape(scan)}</code>\n"
+    if by_risk:
+        head += "⚠ " + " · ".join(f"{RISK_MARK[r]} {r}: {by_risk[r]}" for r in RISK_RANK if by_risk.get(r)) + "\n"
     head += " · ".join(f"{html.escape(t)}: {n}" for t, n in by_type.most_common()) + "\n\n"
     lines = []
-    for f in findings[:MAX_LINES]:
+    # the risky ones first: they are what the alert is for
+    ordered = sorted(findings, key=lambda f: RISK_RANK.get(f.get("risk"), 9))
+    for f in ordered[:MAX_LINES]:
         mark = " (third party)" if "third-party" in (f.get("tags") or []) else ""
-        lines.append(f"• <code>{html.escape(f['type'])}</code> {html.escape(str(f['data'])[:200])}{mark}")
+        risk = f.get("risk")
+        lead = f"{RISK_MARK[risk]} " if risk in RISK_MARK else "• "
+        why = f" — {html.escape(f['risk_reasons'][0])}" if risk and f.get("risk_reasons") else ""
+        lines.append(f"{lead}<code>{html.escape(f['type'])}</code> {html.escape(str(f['data'])[:200])}{mark}{why}")
     text = head + "\n".join(lines)
     if len(findings) > MAX_LINES:
         text += f"\n… and {len(findings) - MAX_LINES} more"

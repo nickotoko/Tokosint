@@ -75,6 +75,84 @@ def safe_scan_path(name):
     return out if out.is_file() else None
 
 
+SCREENSHOT_TYPES = {".jpeg": "image/jpeg", ".jpg": "image/jpeg", ".png": "image/png"}
+
+
+def screenshot_file(scan, rel):
+    """A gowitness screenshot of a scan: <scan>/gowitness/screenshots/<file>, image types only; None otherwise
+    (protects against path traversal: the path must stay inside the scan's screenshots folder)."""
+    d = safe_scan_dir(scan)
+    if d is None or not rel:
+        return None
+    base = (d / "gowitness" / "screenshots").resolve()
+    try:
+        f = (d / rel).resolve()
+        f.relative_to(base)
+    except (ValueError, OSError):
+        return None
+    if f.suffix.lower() not in SCREENSHOT_TYPES or not f.is_file():
+        return None
+    return f
+
+
+def _scan_root(d):
+    """The original scan of an enrichment (enrich.json "parent", followed up the chain); the scan itself otherwise."""
+    name, seen = d.name, set()
+    while name not in seen:
+        seen.add(name)
+        try:
+            parent = json.loads((SCANS_DIR / name / "enrich.json").read_text()).get("parent")
+        except (OSError, ValueError):
+            parent = None
+        if not parent:
+            return name
+        name = parent
+    return name
+
+
+def list_screenshots(scan=None):
+    """Every gowitness screenshot of every scan (or of one scan with its enrichments), with the file present.
+
+    {"scans": [{name, root, count}], "shots": [{scan, root, path, url, page, status_code, title, status, at}]};
+    root - the original scan (enrichments are shown with it), page - the URL that was visited, url - where the
+    browser ended up, status - the validity status of the screenshot."""
+    want = _scan_root(SCANS_DIR / scan) if scan else None
+    shots, per_scan = [], {}
+    if not SCANS_DIR.is_dir():
+        return {"scans": [], "shots": []}
+    for d in sorted(SCANS_DIR.iterdir()):
+        if not (d.is_dir() and (d / "gowitness" / "screenshots").is_dir() and (d / "output.json").is_file()):
+            continue
+        root = _scan_root(d)
+        if want and root != want:
+            continue
+        events = read_events(d / "output.json")
+        urls = {e.get("id"): e for e in events if e.get("type") == "URL"}
+        for e in events:
+            if e.get("type") != "WEBSCREENSHOT":
+                continue
+            data = e.get("data") if isinstance(e.get("data"), dict) else (e.get("data_json") or {})
+            if not data.get("path") or screenshot_file(d.name, data["path"]) is None:
+                continue
+            tags = e.get("tags") or []
+            status = next((t[len("validity-"):] for t in tags if t.startswith("validity-")), None)
+            page = urls.get(e.get("parent"))
+            # the code the browser got; screenshots taken before gowitness recorded it fall back to the http
+            # module's answer for the same URL (the first answer, before redirects)
+            code, code_from = data.get("status_code"), "browser"
+            if not code and page:
+                code = next((int(t[7:]) for t in page.get("tags") or [] if t.startswith("status-") and t[7:].isdigit()), None)
+                code_from = "http" if code else None
+            shots.append({"scan": d.name, "root": root, "path": data["path"], "url": data.get("url"),
+                          "page": (asset_data(page) if page else None) or data.get("url"), "status_code": code,
+                          "code_from": code_from if code else None, "title": data.get("title"), "status": status,
+                          "at": e.get("timestamp")})  # fmt: skip
+            per_scan[d.name] = per_scan.get(d.name, 0) + 1
+    shots.sort(key=lambda x: (x["root"], -(x["at"] or 0), x["url"] or ""))
+    scans_out = [{"name": n, "root": _scan_root(SCANS_DIR / n), "count": c} for n, c in sorted(per_scan.items())]
+    return {"scans": scans_out, "shots": shots}
+
+
 def read_events(path):
     events = []
     with open(path, encoding="utf-8") as fh:
@@ -235,7 +313,7 @@ def aggregate_scan(path, with_false=True, include_enrichments=False):
         if a is None:
             a = {"type": etype, "data": data, "sources": set(), "tags": set(), "last_seen": None, "status": None,
                  "details": {}, "contexts": {}, "false_reasons": [], "hosts": set(), "ports": set(),
-                 "on": {}, "via": None, "enriched_by": set()}  # fmt: skip
+                 "on": {}, "via": None, "enriched_by": set(), "screenshots": {}, "codes": set()}  # fmt: skip
             by_key[key] = a
         return a
 
@@ -244,6 +322,7 @@ def aggregate_scan(path, with_false=True, include_enrichments=False):
     for enrichment, group, group_uuids in groups:
         if enrichment and not original:
             original = set(by_key)
+        by_id = {e.get("id"): e for e in group if e.get("type") == "URL"}
         for e in group:
             etype = e.get("type")
             if not etype or etype == "SCAN":
@@ -287,6 +366,21 @@ def aggregate_scan(path, with_false=True, include_enrichments=False):
                 on = a["on"].setdefault(host, set())
                 if port:
                     on.add(port)
+            if etype == "WEBSCREENSHOT":
+                # gowitness: the image file lives in the scan that took it (an enrichment has its own folder);
+                # the screenshot also goes to the URL it shows, so the URL's card and the gallery can show it
+                d = e.get("data") if isinstance(e.get("data"), dict) else (e.get("data_json") or {})
+                # a failed shot of an older gowitness run points at the folder: only real image files count
+                if d.get("path") and screenshot_file(enrichment or path.parent.name, d["path"]) is not None:
+                    shot = {"scan": enrichment or path.parent.name, "path": d["path"], "url": d.get("url") or data,
+                            "status_code": d.get("status_code"), "title": d.get("title")}  # fmt: skip
+                    if d.get("status_code"):
+                        a["codes"].add(int(d["status_code"]))
+                    a["screenshots"].setdefault(shot["path"], shot)
+                    parent = by_id.get(e.get("parent"))
+                    target = by_key.get(f"URL\x00{asset_data(parent)}") if parent is not None else None
+                    if target is not None:
+                        target["screenshots"].setdefault(shot["path"], shot)
             ctx = e.get("discovery_context")
             if ctx and len(a["contexts"]) < MAX_CONTEXTS:
                 a["contexts"].setdefault(f"{module}\x00{ctx}", {"module": module, "context": ctx[:500]})
@@ -334,9 +428,11 @@ def aggregate_scan(path, with_false=True, include_enrichments=False):
             "on": [{"host": h, "ports": sorted(p)} for h, p in sorted(a["on"].items())],
             "via": sorted(a["via"] or ()),
             "enriched_by": sorted(a["enriched_by"]),
+            "screenshots": list(a["screenshots"].values()),
             "registrable": is_registrable(a["type"], a["data"]),
             # HTTP status codes of a URL (http's status-NNN tags; several when the answer changed between paths)
-            "http_status": sorted({int(t[7:]) for t in tags if t.startswith("status-") and t[7:].isdigit()}),
+            # (a screenshot: the code the browser got, after redirects)
+            "http_status": sorted({int(t[7:]) for t in tags if t.startswith("status-") and t[7:].isdigit()} | a["codes"]),
         })
     out.sort(key=lambda a: (-len(a["sources"]), a["type"], a["data"]))
     return out
