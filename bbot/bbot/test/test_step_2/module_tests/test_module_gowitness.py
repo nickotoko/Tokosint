@@ -70,21 +70,32 @@ class TestGowitnessFake(ModuleTestBase):
             con = sqlite3.connect(db)
             con.execute(
                 "CREATE TABLE results (id INTEGER, url TEXT, final_url TEXT, filename TEXT, response_code INTEGER,"
-                " title TEXT, failed INTEGER, failed_reason TEXT)"
+                " response_reason TEXT, title TEXT, failed INTEGER, failed_reason TEXT)"
             )
             con.execute("CREATE TABLE network_logs (result_id INTEGER, url TEXT, status_code INTEGER, remote_ip TEXT)")
             con.execute("CREATE TABLE technologies (result_id INTEGER, value TEXT)")
+            cols = "(id, url, final_url, filename, response_code, response_reason, title, failed, failed_reason)"
             for i, url in enumerate(visited, 1):
                 if outcome == "missing":
                     continue
                 if outcome == "failed":
                     con.execute(
-                        "INSERT INTO results VALUES (?, ?, ?, '', 0, '', 1, 'net::ERR_TIMED_OUT')", (i, url, url)
+                        f"INSERT INTO results {cols} VALUES (?, ?, ?, '', 0, '', '', 1, 'net::ERR_TIMED_OUT')",
+                        (i, url, url),
                     )
                     continue
                 (module.screenshot_path / f"page{i}.jpeg").write_bytes(b"\xff\xd8\xff")
+                if outcome == "redirect":
+                    # the browser was pointed at http:// and ended up at https:// (a 301 hop)
+                    final = url.replace("http://", "https://")
+                    con.execute(
+                        f"INSERT INTO results {cols} VALUES (?, ?, ?, ?, 200, 'OK', 'Landing', 0, '')",
+                        (i, url, final, f"page{i}.jpeg"),
+                    )
+                    con.execute("INSERT INTO network_logs VALUES (?, ?, 301, '8.8.8.8')", (i, url))
+                    continue
                 con.execute(
-                    "INSERT INTO results VALUES (?, ?, ?, ?, 403, 'Forbidden page', 0, '')",
+                    f"INSERT INTO results {cols} VALUES (?, ?, ?, ?, 403, 'Forbidden', 'Forbidden page', 0, '')",
                     (i, url, url, f"page{i}.jpeg"),
                 )
                 con.execute(
@@ -119,6 +130,9 @@ class TestGowitnessFake(ModuleTestBase):
         assert shots[0].parent.type == "URL"
         # the answer the browser got and the page title travel with the screenshot
         assert shots[0].data["status_code"] == 403 and shots[0].data["title"] == "Forbidden page"
+        assert shots[0].data["status_reason"] == "Forbidden"
+        # no redirect here: requested == final, so no chain is recorded
+        assert "redirect_chain" not in shots[0].data and "requested_url" not in shots[0].data
         assert module_test.scan.modules["gowitness"].failures == {}
         assert "--log-scan-errors" in self.commands[0]
         assert any(e.type == "TECHNOLOGY" and e.data["technology"] == "nginx" for e in events)
@@ -180,6 +194,23 @@ class TestGowitnessRedirects(TestGowitnessFake):
     def check(self, module_test, events):
         assert self.inside[0] is False and "in-scope" in self.inside[1]
         assert self.outside is True
+
+
+class TestGowitnessFakeRedirectChain(TestGowitnessFake):
+    """The browser follows a redirect: the requested URL, the final URL and the chain travel with the shot."""
+
+    outcome = "redirect"
+
+    def check(self, module_test, events):
+        shots = [e for e in events if e.type == "WEBSCREENSHOT"]
+        assert len(shots) == 1
+        d = shots[0].data
+        assert d["url"] == f"{HTTPSERVER_URL}/".replace("http://", "https://")  # ended at https
+        assert d["requested_url"] == f"{HTTPSERVER_URL}/"  # was pointed at http
+        assert d["status_code"] == 200 and d["status_reason"] == "OK" and d["title"] == "Landing"
+        chain = d["redirect_chain"]
+        assert [s["url"] for s in chain] == [f"{HTTPSERVER_URL}/", f"{HTTPSERVER_URL}/".replace("http://", "https://")]
+        assert chain[0].get("code") == 301 and chain[1].get("code") == 200
 
 
 class TestGowitnessMissing(ModuleTestBase):

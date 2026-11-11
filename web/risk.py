@@ -15,8 +15,8 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 RULES_FILE = Path(__file__).resolve().parent / "risk.json"
-LEVELS = ("critical", "high", "medium")
-RANK = {None: 0, "medium": 1, "high": 2, "critical": 3}
+LEVELS = ("critical", "high", "medium", "low")
+RANK = {None: 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 _PORT_RE = re.compile(r":(\d{1,5})$")
 # a URL path rule matches a whole path segment start: /admin matches /admin, /admin/, /admin.php - not /administer
 _SEGMENT_END = re.compile(r"[/?#.\-_;]|$")

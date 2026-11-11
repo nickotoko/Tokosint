@@ -298,7 +298,7 @@ def test_screenshots_go_to_the_url_and_are_served_safely(tmp_env):
     (d / "output.json.bak").write_text("secret")
     found = {(f["type"], f["data"]): f for f in scans.aggregate_scan(d / "output.json")}
     want = [{"scan": "s1", "path": "gowitness/screenshots/login.jpeg", "url": "https://www.acme.example:8443/login",
-             "status_code": None, "title": None}]
+             "status_code": None, "title": None, "requested_url": None, "status_reason": None, "redirect_chain": None}]
     assert found[("URL", "https://www.acme.example:8443/login")]["screenshots"] == want
     assert found[("DNS_NAME", "www.acme.example")]["screenshots"] == []
     # only images inside the scan's screenshots folder
@@ -313,7 +313,9 @@ def test_screenshot_list_across_scans_and_codes(tmp_env):
     url = ev("U:9", "URL", "http://acme.example/", parent="D:1", module="http", host="acme.example",
              tags=TAGS + ["status-301"])  # fmt: skip
     shot = ev("W:9", "WEBSCREENSHOT", data_json={"path": "gowitness/screenshots/a.jpeg", "url": "https://acme.example/",
-              "status_code": 403, "title": "Forbidden"}, parent="U:9", module="gowitness")  # fmt: skip
+              "status_code": 403, "title": "Forbidden", "requested_url": "http://acme.example/", "status_reason": "Forbidden",
+              "redirect_chain": [{"url": "http://acme.example/", "code": 301}, {"url": "https://acme.example/", "code": 403}]},
+              parent="U:9", module="gowitness")  # fmt: skip
     broken = ev("W:8", "WEBSCREENSHOT", data_json={"path": "gowitness/screenshots", "url": "https://b.acme.example/"},
                 parent="U:9", module="gowitness")  # fmt: skip
     write_scan(tmp_env, "base", BASE_EVENTS)
@@ -328,6 +330,9 @@ def test_screenshot_list_across_scans_and_codes(tmp_env):
     assert (s["scan"], s["root"], s["page"], s["url"], s["status_code"]) == (
         "base-enrich-1", "base", "http://acme.example/", "https://acme.example/", 403)
     assert s["code_from"] == "browser"
+    # the redirect chain, the requested URL and the reason travel through to the Screenshots tab
+    assert s["requested_url"] == "http://acme.example/" and s["status_reason"] == "Forbidden"
+    assert [h["url"] for h in s["redirect_chain"]] == ["http://acme.example/", "https://acme.example/"]
     assert every["scans"] == [{"name": "base-enrich-1", "root": "base", "count": 1}]
     # asked for the original scan: its enrichments' screenshots come with it
     assert len(scans.list_screenshots("base")["shots"]) == 1

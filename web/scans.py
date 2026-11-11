@@ -146,7 +146,8 @@ def list_screenshots(scan=None):
             shots.append({"scan": d.name, "root": root, "path": data["path"], "url": data.get("url"),
                           "page": (asset_data(page) if page else None) or data.get("url"), "status_code": code,
                           "code_from": code_from if code else None, "title": data.get("title"), "status": status,
-                          "at": e.get("timestamp")})  # fmt: skip
+                          "requested_url": data.get("requested_url"), "status_reason": data.get("status_reason"),
+                          "redirect_chain": data.get("redirect_chain"), "at": e.get("timestamp")})  # fmt: skip
             per_scan[d.name] = per_scan.get(d.name, 0) + 1
     shots.sort(key=lambda x: (x["root"], -(x["at"] or 0), x["url"] or ""))
     scans_out = [{"name": n, "root": _scan_root(SCANS_DIR / n), "count": c} for n, c in sorted(per_scan.items())]
@@ -373,7 +374,9 @@ def aggregate_scan(path, with_false=True, include_enrichments=False):
                 # a failed shot of an older gowitness run points at the folder: only real image files count
                 if d.get("path") and screenshot_file(enrichment or path.parent.name, d["path"]) is not None:
                     shot = {"scan": enrichment or path.parent.name, "path": d["path"], "url": d.get("url") or data,
-                            "status_code": d.get("status_code"), "title": d.get("title")}  # fmt: skip
+                            "status_code": d.get("status_code"), "title": d.get("title"),
+                            "requested_url": d.get("requested_url"), "status_reason": d.get("status_reason"),
+                            "redirect_chain": d.get("redirect_chain")}  # fmt: skip
                     if d.get("status_code"):
                         a["codes"].add(int(d["status_code"]))
                     a["screenshots"].setdefault(shot["path"], shot)

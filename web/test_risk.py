@@ -51,7 +51,8 @@ def test_status_and_ownership():
     assert risk.assess(f("OPEN_TCP_PORT", port, status=None))[0] == "critical"  # untagged scan
     level, reasons = risk.assess(f("OPEN_TCP_PORT", port, status="historical"))
     assert level == "high" and reasons[-1].startswith("historical")
-    assert risk.assess(f("OPEN_TCP_PORT", "1.2.3.4:22", status="historical"))[0] is None  # medium -> none
+    assert risk.assess(f("OPEN_TCP_PORT", "1.2.3.4:22", status="historical"))[0] == "low"  # medium -> low
+    assert risk.assess(f("OPEN_TCP_PORT", "1.2.3.4:53", status="historical"))[0] is None  # low -> none
     assert risk.assess(f("OPEN_TCP_PORT", port, status="false")) == (None, [])
     assert risk.assess(f("OPEN_TCP_PORT", port, tags=["third-party"])) == (None, [])
     # timeline rows carry third_party instead of the tag
@@ -61,7 +62,15 @@ def test_status_and_ownership():
 def test_annotate_and_counts():
     items = risk.annotate([f("OPEN_TCP_PORT", "a.target.example:6379"), f("DNS_NAME", "a.target.example")])
     assert items[0]["risk"] == "critical" and items[1]["risk"] is None and items[1]["risk_reasons"] == []
-    assert risk.counts(items) == {"critical": 1, "high": 0, "medium": 0}
+    assert risk.counts(items) == {"critical": 1, "high": 0, "medium": 0, "low": 0}
+
+
+def test_low_tier():
+    err = f("FINDING", "https://target.example/", details={"name": "Possible Verbose Error Message", "severity": "INFO"})
+    assert risk.assess(err) == ("low", ["verbose error message (info disclosure)"])
+    jwt = f("FINDING", "x", details={"name": "HTTP response contains JSON Web Token (JWT)", "severity": "INFO"})
+    assert risk.assess(jwt)[0] == "medium"
+    assert risk.assess(f("OPEN_TCP_PORT", "a.target.example:53"))[0] == "low"  # DNS
 
 
 def test_telegram_summary_puts_risky_first():

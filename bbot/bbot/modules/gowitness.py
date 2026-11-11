@@ -280,10 +280,20 @@ class gowitness(BaseModule):
                         continue
                     data = {"path": str(filename), "url": final_url}
                     # the answer the browser got (after redirects) and the page title
-                    if row.get("response_code"):
-                        data["status_code"] = int(row["response_code"])
+                    status_code = int(row["response_code"]) if row.get("response_code") else None
+                    if status_code:
+                        data["status_code"] = status_code
+                    if row.get("response_reason"):
+                        data["status_reason"] = str(row["response_reason"])[:100]
                     if row.get("title"):
                         data["title"] = str(row["title"])[:300]
+                    # the URL the browser was pointed at, if it ended up somewhere else (a redirect)
+                    if raw_url and raw_url != final_url:
+                        data["requested_url"] = raw_url
+                    # the full redirect chain (requested -> ... -> final), when gowitness logged the hops
+                    chain = await self._redirect_chain(con, row["id"], raw_url, final_url, status_code)
+                    if len(chain) > 1:
+                        data["redirect_chain"] = chain
                     await self.emit_event(
                         data,
                         "WEBSCREENSHOT",
@@ -350,6 +360,37 @@ class gowitness(BaseModule):
         reason = " ".join(str(reason).split())[:200]
         self.failures[reason] = self.failures.get(reason, 0) + 1
         self.verbose(f"No screenshot of {url}: {reason}")
+
+    async def _redirect_chain(self, con, result_id, requested, final, final_code):
+        """The redirect chain requested URL -> ... -> final URL, as [{url, code?}, ...].
+
+        The intermediate hops come from gowitness's 3xx network logs. gowitness does not always
+        record them (an HSTS or port-normalisation redirect leaves no network response), so the
+        chain falls back to just [requested, final]. `code` is the status the browser got at that
+        URL: a 3xx for a hop, the final response code for the last step.
+        """
+        hops = []
+        async with con.execute(
+            "SELECT url, status_code FROM network_logs "
+            "WHERE result_id = ? AND status_code >= 300 AND status_code < 400 ORDER BY rowid",
+            (result_id,),
+        ) as cur:
+            async for row in cur:
+                if row["url"]:
+                    hops.append((row["url"], int(row["status_code"])))
+        steps = []
+        for url, code in [(requested, None), *hops, (final, final_code)]:
+            if not url:
+                continue
+            if steps and steps[-1]["url"] == url:
+                if code:
+                    steps[-1]["code"] = code
+                continue
+            step = {"url": url}
+            if code:
+                step["code"] = code
+            steps.append(step)
+        return steps
 
     def construct_command(self, db_path):
         # base executable

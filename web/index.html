@@ -128,15 +128,18 @@
   .st { display: inline-block; font-size: 12px; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
   .st::before { content: "● "; }
   /* risk of a finding (web/risk.py): what to look at first */
-  :root { --rk-critical: #a43ae0; --rk-high: #d64545; --rk-medium: #d9822b; }
+  :root { --rk-critical: #a43ae0; --rk-high: #d64545; --rk-medium: #d9822b; --rk-low: #4b83c9; }
   .rk { display: inline-block; font-size: 11.5px; font-weight: 650; padding: 2px 9px; border-radius: 999px; white-space: nowrap;
     text-transform: uppercase; letter-spacing: .03em; }
   .rk.critical { color: #fff; background: var(--rk-critical); }
   .rk.high { color: #fff; background: var(--rk-high); }
   .rk.medium { color: var(--rk-medium); background: color-mix(in srgb, var(--rk-medium) 16%, transparent); }
+  .rk.low { color: var(--rk-low); background: color-mix(in srgb, var(--rk-low) 14%, transparent); }
+  .rk.on { outline: 2px solid currentColor; outline-offset: 1px; }
   tr.risk-critical > td:first-child { box-shadow: inset 4px 0 0 var(--rk-critical); }
   tr.risk-high > td:first-child { box-shadow: inset 4px 0 0 var(--rk-high); }
   tr.risk-medium > td:first-child { box-shadow: inset 4px 0 0 color-mix(in srgb, var(--rk-medium) 70%, transparent); }
+  tr.risk-low > td:first-child { box-shadow: inset 4px 0 0 color-mix(in srgb, var(--rk-low) 60%, transparent); }
   tbody tr.risk-critical { background: color-mix(in srgb, var(--rk-critical) 7%, transparent); }
   tbody tr.risk-high { background: color-mix(in srgb, var(--rk-high) 6%, transparent); }
   .riskline { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
@@ -152,7 +155,10 @@
   .shot .cap .u { font: 12px var(--mono); }
   .shot .cap .meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
   .shot.risk-critical { border-color: var(--rk-critical); } .shot.risk-high { border-color: var(--rk-high); }
+  .shot.risk-medium { border-color: color-mix(in srgb, var(--rk-medium) 70%, var(--line)); } .shot.risk-low { border-color: color-mix(in srgb, var(--rk-low) 60%, var(--line)); }
   .shotprev img { max-width: 100%; border: 1px solid var(--line); border-radius: 8px; display: block; margin-bottom: 6px; }
+  .shotcap { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; } .shotcap .t { font-weight: 550; color: var(--text); }
+  dd.chain { font: 12px var(--mono); word-break: break-all; line-height: 1.7; } dd.chain .arrow { color: var(--muted); }
   .btn.on { background: var(--accent-weak); color: var(--accent); border-color: var(--accent); }
   .shot .cap .code { font: 600 11.5px var(--mono); padding: 1px 7px; border-radius: 6px; background: var(--chip); }
   .shot .cap .code.c2 { color: var(--in); } .shot .cap .code.c3 { color: var(--accent); }
@@ -354,10 +360,11 @@
         <option value="">HTTP: any</option>
       </select>
       <select id="r-risk" title="Risk level (rules: web/risk.json)">
-        <option value="">risk: any</option>
+        <option value="">risk: all</option>
         <option value="critical">critical</option>
-        <option value="high">high and above</option>
-        <option value="medium">any risk</option>
+        <option value="high">high</option>
+        <option value="medium">medium</option>
+        <option value="low">low</option>
       </select>
       <select id="r-owner">
         <option value="">ownership: any</option>
@@ -1136,7 +1143,7 @@ fetch("/api/sources").then((r) => r.json()).then((data) => {
 // default order: findings with more sources first
 let ASSETS = [], rSort = { k: "nsources", dir: -1 };
 const IOC_LABEL = { valid: "valid", historical: "historical", false: "false" };
-const RISK_RANK = { critical: 3, high: 2, medium: 1 };
+const RISK_RANK = { critical: 4, high: 3, medium: 2, low: 1 };
 const riskBadge = (r) => el("span", "rk " + r, r);
 // /api/screenshot/<scan>/<path inside the scan>
 const shotUrl = (s) => "/api/screenshot/" + encodeURIComponent(s.scan) + "/" + s.path.split("/").map(encodeURIComponent).join("/");
@@ -1228,13 +1235,13 @@ function renderResults() {
   const ports = parsePorts($("#r-port").value);
   $("#r-port").classList.toggle("bad", ports === false);
   const q = $("#r-q").value.trim().toLowerCase(), type = $("#r-type").value, src = $("#r-source").value, rst = $("#r-status").value, own = $("#r-owner").value;
-  const rk = RISK_RANK[$("#r-risk").value] || 0;
+  const rlevel = $("#r-risk").value;
   const rows = ASSETS.filter((a) =>
     (!q || a.data.toLowerCase().includes(q) || (a.hosts || []).some((h) => h.toLowerCase().includes(q)) ||
       (a.type === "TECHNOLOGY" && techLabel(a.data).toLowerCase().includes(q))) &&
     (!ports || portMatch(a, ports)) && typeMatch(a, type) && httpMatch(a, $("#r-http").value) && (!src || a.sources.includes(src)) &&
     (!rst || (a.status || "none") === rst) &&
-    (!own || ownerOf(a) === own) && (!rk || (RISK_RANK[a.risk] || 0) >= rk));
+    (!own || ownerOf(a) === own) && (!rlevel || a.risk === rlevel));
   rows.sort((a, b) => {
     const x = sortKey(a, rSort.k), y = sortKey(b, rSort.k);
     return ((x < y ? -1 : x > y ? 1 : 0) * rSort.dir) || (b.sources.length - a.sources.length) || a.data.localeCompare(b.data);
@@ -1390,8 +1397,18 @@ function openViewer(i) {
   $("#v-pos").textContent = `${SHOT_I + 1} / ${SHOTS_VIEW.length}`;
   const m = $("#v-meta"); m.innerHTML = "";
   const row = (k, v) => { if (v == null || v === "") return; m.appendChild(el("dt", null, k)); const d = el("dd"); d.dataset.i18nSkip = ""; d.textContent = v; m.appendChild(d); };
-  row("Visited", s.page); if (s.url !== s.page) row("Ended at", s.url);
-  row("HTTP code", s.status_code ? String(s.status_code) + (s.code_from === "http" ? " (first answer, before redirects)" : "") : "—");
+  row("Visited", s.requested_url || s.page); if (s.url !== (s.requested_url || s.page)) row("Ended at", s.url);
+  if (s.redirect_chain && s.redirect_chain.length > 1) {
+    m.appendChild(el("dt", null, "Redirect chain"));
+    const dd = el("dd", "chain"); dd.dataset.i18nSkip = "";
+    s.redirect_chain.forEach((step, idx) => {
+      if (idx) dd.appendChild(el("span", "arrow", " → "));
+      const u = el("span", null, step.url); if (step.code) u.title = "HTTP " + step.code; dd.appendChild(u);
+    });
+    m.appendChild(dd);
+  }
+  const reason = s.status_reason ? " " + s.status_reason : "";
+  row("HTTP code", s.status_code ? String(s.status_code) + reason + (s.code_from === "http" ? " (first answer, before redirects)" : "") : "—");
   row("Page title", s.title);
   row("Status", s.status || "—"); row("Scan", s.scan + (s.scan !== s.root ? ` (enrichment of ${s.root})` : ""));
   if (s.at) row("Taken", fmtSeen(s.at));
@@ -1412,11 +1429,14 @@ document.addEventListener("keydown", (ev) => {
 // risk counts of the whole scan; a click filters by the level
 function renderRiskCounts() {
   const box = $("#r-risks"); box.innerHTML = "";
-  const c = { critical: 0, high: 0, medium: 0 }; ASSETS.forEach((a) => { if (a.risk in c) c[a.risk]++; });
-  for (const r of ["critical", "high", "medium"]) {
+  const sel = $("#r-risk").value;
+  const c = { critical: 0, high: 0, medium: 0, low: 0 }; ASSETS.forEach((a) => { if (a.risk in c) c[a.risk]++; });
+  for (const r of ["critical", "high", "medium", "low"]) {
     if (!c[r]) continue;
-    const b = riskBadge(r); b.textContent = `${r} ${c[r]}`; b.title = `show ${r} findings`;
-    b.onclick = () => { $("#r-risk").value = r; renderResults(); };
+    const b = riskBadge(r); b.textContent = `${r} ${c[r]}`;
+    b.classList.toggle("on", sel === r);
+    b.title = sel === r ? `clear the ${r} filter` : `show only ${r} findings`;
+    b.onclick = () => { $("#r-risk").value = (sel === r ? "" : r); renderResults(); };
     box.appendChild(b);
   }
 }
@@ -1720,6 +1740,10 @@ function openAsset(a) {
     const seen = new Set(); a.screenshots.filter((s) => !seen.has(s.url) && seen.add(s.url)).forEach((s) => { const link = el("a"); link.href = shotUrl(s); link.target = "_blank"; link.rel = "noopener";
       link.title = "open full size"; const img = el("img"); img.loading = "lazy"; img.src = shotUrl(s); img.alt = s.url;
       link.appendChild(img); d.appendChild(link);
+      const cap = el("div", "muted shotcap");
+      if (s.status_code) cap.appendChild(codeChip(s.status_code));
+      if (s.title) cap.appendChild(el("span", "t", s.title));
+      if (cap.childNodes.length) { cap.dataset.i18nSkip = ""; d.appendChild(cap); }
       if (s.url !== a.data) d.appendChild(el("div", "muted", "→ " + s.url)); });
     row("Screenshot", d);
   }

@@ -314,9 +314,11 @@
   "requests": "запросы",
   "Risk": "Риск",
   "risk: any": "риск: любой",
+  "risk: all": "риск: все",
   "critical": "критичный",
   "high": "высокий",
   "medium": "средний",
+  "low": "низкий",
   "high and above": "высокий и выше",
   "any risk": "любой риск",
   "What to look at first: an open database, a login form, a VPN portal... (rules: web/risk.json)": "Что смотреть первым: открытая БД, форма логина, VPN-портал… (правила: web/risk.json)",
@@ -338,6 +340,7 @@
   "Open the scan": "Открыть скан",
   "Visited": "Открыт",
   "Ended at": "Итоговый адрес",
+  "Redirect chain": "Цепочка редиректов",
   "HTTP code": "HTTP-код",
   "Page title": "Заголовок страницы",
   "Scan": "Скан",
@@ -750,12 +753,16 @@
    "DNS-проверка имён: $1"
   ],
   [
-   "^(critical|high|medium) (\\d+)$",
+   "^(critical|high|medium|low) (\\d+)$",
    "$1 $2"
   ],
   [
-   "^show (critical|high|medium) findings$",
-   "показать: $1"
+   "^show only (critical|high|medium|low) findings$",
+   "показать только: $1"
+  ],
+  [
+   "^clear the (critical|high|medium|low) filter$",
+   "сбросить фильтр: $1"
   ],
   [
    "^(\\d+) screenshot\\(s\\) · (\\d+) of (\\d+) findings$",

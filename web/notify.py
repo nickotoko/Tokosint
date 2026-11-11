@@ -63,8 +63,8 @@ def send(text, chat_id=None):
         return False, type(e).__name__
 
 
-RISK_MARK = {"critical": "🟪", "high": "🟥", "medium": "🟧"}
-RISK_RANK = {"critical": 0, "high": 1, "medium": 2}
+RISK_MARK = {"critical": "🟪", "high": "🟥", "medium": "🟧", "low": "🟨"}
+RISK_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 
 
 def format_summary(company, scan, findings, base_url=""):
