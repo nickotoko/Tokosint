@@ -220,58 +220,48 @@ _ASSET_SETS = ("sources", "tags", "hosts", "ports", "http_status", "enriched_by"
 _STATUS_ORDER = {None: -1, "false": 0, "historical": 1, "valid": 2}
 
 
-def company_assets(company_id):
-    """All assets of a company: aggregate each of its scans and merge by (type, value). Overrides and risk are
-    applied to the merged result, so it matches the per-scan Analysis view. On-demand (no cache): heavy on very
-    large scans, like the scan view itself."""
-    import overrides
+def _new_asset(f):
+    a = {"type": f["type"], "data": f["data"], "status": f.get("status"), "last_seen": f.get("last_seen"),
+         "scan_date": f.get("scan_date"), "registrable": f.get("registrable", False), "details": {},
+         "contexts": [], "false_reasons": [], "on": {}, "via": set(), "screenshots": {}, "scans": set()}  # fmt: skip
+    for s in _ASSET_SETS:
+        a[s] = set()
+    return a
 
-    import scans
 
-    store.get_company(company_id)  # validates / 404
-    links = store.company_scans(company_id)
-    acc = {}
-    for link in links:
-        path = scans.safe_scan_path(link["scan"])
-        if path is None:
-            continue
-        for f in scans.aggregate_scan(path, include_enrichments=False):
-            key = (f["type"], str(f["data"]))
-            a = acc.get(key)
-            if a is None:
-                a = {"type": f["type"], "data": f["data"], "status": f.get("status"),
-                     "last_seen": f.get("last_seen"), "scan_date": f.get("scan_date"),
-                     "registrable": f.get("registrable", False), "details": {}, "contexts": [],
-                     "false_reasons": [], "on": {}, "via": set(), "screenshots": {}, "scans": set()}  # fmt: skip
-                for s in _ASSET_SETS:
-                    a[s] = set()
-                acc[key] = a
-            for s in _ASSET_SETS:
-                a[s] |= set(f.get(s) or [])
-            a["via"] |= set(f.get("via") or [])
-            a["scans"].add(link["scan"])
-            for k, v in (f.get("details") or {}).items():
-                a["details"].setdefault(k, v)
-            for ctx in f.get("contexts") or []:
-                if ctx not in a["contexts"]:
-                    a["contexts"].append(ctx)
-            for fr in f.get("false_reasons") or []:
-                if fr not in a["false_reasons"]:
-                    a["false_reasons"].append(fr)
-            for item in f.get("on") or []:
-                a["on"].setdefault(item["host"], set()).update(item.get("ports") or [])
-            for sh in f.get("screenshots") or []:
-                a["screenshots"].setdefault(sh.get("path"), sh)
-            if _STATUS_ORDER.get(f.get("status"), -1) > _STATUS_ORDER.get(
-                a["status"], -1
-            ):
-                a["status"] = f.get("status")
-            ls = f.get("last_seen")
-            if isinstance(ls, (int, float)) and (
-                a["last_seen"] is None or ls > a["last_seen"]
-            ):
-                a["last_seen"] = ls
+def _merge_asset(acc, f, scan):
+    """Fold one scan's aggregated finding into the company-wide asset keyed by (type, value)."""
+    key = (f["type"], str(f["data"]))
+    a = acc.get(key)
+    if a is None:
+        a = acc[key] = _new_asset(f)
+    for s in _ASSET_SETS:
+        a[s] |= set(f.get(s) or [])
+    a["via"] |= set(f.get("via") or [])
+    a["scans"].add(scan)
+    for k, v in (f.get("details") or {}).items():
+        a["details"].setdefault(k, v)
+    for ctx in f.get("contexts") or []:
+        if ctx not in a["contexts"]:
+            a["contexts"].append(ctx)
+    for fr in f.get("false_reasons") or []:
+        if fr not in a["false_reasons"]:
+            a["false_reasons"].append(fr)
+    for item in f.get("on") or []:
+        a["on"].setdefault(item["host"], set()).update(item.get("ports") or [])
+    for sh in f.get("screenshots") or []:
+        a["screenshots"].setdefault(sh.get("path"), sh)
+    if _STATUS_ORDER.get(f.get("status"), -1) > _STATUS_ORDER.get(a["status"], -1):
+        a["status"] = f.get("status")
+    ls = f.get("last_seen")
+    if isinstance(ls, (int, float)) and (a["last_seen"] is None or ls > a["last_seen"]):
+        a["last_seen"] = ls
+    sd = f.get("scan_date")
+    if isinstance(sd, (int, float)) and (a["scan_date"] is None or sd > a["scan_date"]):
+        a["scan_date"] = sd
 
+
+def _asset_rows(acc, links):
     rows = []
     for a in acc.values():
         rows.append({
@@ -286,7 +276,44 @@ def company_assets(company_id):
         })  # fmt: skip
     # one override log covers the whole company; apply it, then risk
     if links:
+        import overrides
+
         overrides.apply(links[0]["scan"], rows)
     risk.annotate(rows)
+    return rows
+
+
+def company_assets(company_id):
+    """All assets of a company: aggregate each of its scans and merge by (type, value). Overrides and risk are
+    applied to the merged result, so it matches the per-scan Analysis view. On-demand (no cache): heavy on very
+    large scans, like the scan view itself."""
+    import scans
+
+    store.get_company(company_id)  # validates / 404
+    links = store.company_scans(company_id)
+    acc = {}
+    for link in links:
+        path = scans.safe_scan_path(link["scan"])
+        if path is None:
+            continue
+        for f in scans.aggregate_scan(path, include_enrichments=False):
+            _merge_asset(acc, f, link["scan"])
+    rows = _asset_rows(acc, links)
     rows.sort(key=lambda r: (-len(r["sources"]), r["type"], str(r["data"])))
     return rows
+
+
+def company_finding(company_id, etype, data):
+    """The full card of one finding of a company (the Findings tab drill-down): its cached per-scan records
+    (eventdb.scan_findings keeps the whole aggregated finding) merged over the company's scans, with the manual
+    status and risk applied - the same record the Assets tab shows, without re-aggregating the scans. None when the
+    finding is not cached (e.g. it carries no risk level)."""
+    store.get_company(company_id)  # validates / 404
+    links = store.company_scans(company_id)
+    acc = {}
+    for scan, f in eventdb.finding_for_scans([link["scan"] for link in links], etype, str(data)):
+        _merge_asset(acc, f, scan)
+    if not acc:
+        return None
+    rows = _asset_rows(acc, links)
+    return rows[0]

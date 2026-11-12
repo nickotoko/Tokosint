@@ -268,6 +268,15 @@ def link_scan(scan, company_id, schedule_id=None, started_at=None):
         c.commit()
 
 
+def unlink_scan(scan, company_id):
+    """Detach a scan from its company (the scan files and the findings cache are kept; the scan becomes free)."""
+    with _lock, closing(connect()) as c:
+        cur = c.execute("DELETE FROM scan_links WHERE scan = ? AND company_id = ?", (scan, company_id))
+        c.commit()
+    if cur.rowcount == 0:
+        raise StoreError(f"scan {scan} is not linked to this company", 404)
+
+
 def scan_link(scan):
     with closing(connect()) as c:
         r = c.execute("SELECT * FROM scan_links WHERE scan = ?", (scan,)).fetchone()

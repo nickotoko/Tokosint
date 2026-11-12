@@ -4,6 +4,13 @@ from bbot.core.config.models import BaseModuleConfig, Field
 
 
 class github_codesearch(github, subdomain_enum):
+    """
+    Code containing the target domain. A repository that mentions the domain (an adblock / tracker list, a client
+    library of the target's API, someone's config) is not proven to belong to the target: it is tagged
+    `code-mention` - validity reports it as third-party, and the downloaders (git_clone, github_workflows) skip it
+    unless `download_mentions` is on. Repositories of the target itself come from github_org / code_repository.
+    """
+
     watched_events = ["DNS_NAME"]
     produced_events = ["CODE_REPOSITORY", "URL_UNVERIFIED"]
     flags = ["safe", "passive", "subdomain-enum", "code-enum"]
@@ -27,7 +34,9 @@ class github_codesearch(github, subdomain_enum):
     async def handle_event(self, event):
         query = self.make_query(event)
         for repo_url, raw_urls in (await self.query(query)).items():
-            repo_event = self.make_event({"url": repo_url}, "CODE_REPOSITORY", tags="git", parent=event)
+            repo_event = self.make_event(
+                {"url": repo_url}, "CODE_REPOSITORY", tags=["git", "code-mention"], parent=event
+            )
             if repo_event is None:
                 continue
             await self.emit_event(

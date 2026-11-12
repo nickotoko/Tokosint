@@ -103,3 +103,19 @@ Gnl54dJHT+EhlfY=
         assert [e for e in events if e.type == "FINDING" and str(e.module) == "trufflehog"], (
             "Failed to find secret in repo file"
         )
+        # the repository only mentions the target: not its asset, and not downloaded whole
+        repo = next(e for e in events if e.type == "CODE_REPOSITORY")
+        assert {"code-mention", "third-party"} <= repo.tags, repo.tags
+
+
+
+class TestGithub_CodesearchMentionsNotDownloaded(TestGithub_Codesearch):
+    """git_clone skips a repository found by code search: it only mentions the target."""
+
+    module_name = "github_codesearch"
+
+    modules_overrides = ["github_codesearch", "http", "trufflehog", "git_clone"]
+
+    def check(self, module_test, events):
+        super().check(module_test, events)
+        assert not [e for e in events if e.type == "FILESYSTEM" and str(e.module) == "git_clone"], "mention cloned"

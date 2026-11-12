@@ -21,6 +21,11 @@ class github_workflows(github):
         api_key: str | list[str] = Field("", description="Github token", sensitive=True, mandatory=True)
         num_logs: int = Field(1, description="For each workflow fetch the last N successful runs logs (max 100)")
         output_folder: str = Field("", description="Folder to download workflow logs and artifacts to")
+        download_mentions: bool = Field(
+            False,
+            description="Also download repositories that only mention the target (tagged code-mention by "
+            "github_codesearch): adblock lists, API clients... - slow and mostly unrelated",
+        )
 
     scope_distance_modifier = 2
 
@@ -46,6 +51,9 @@ class github_workflows(github):
             return False, "event is not a git repository"
         elif str(event.host) != "github.com":
             return False, "event is not a github repository"
+        if "code-mention" in event.tags and not self.config.get("download_mentions", False):
+            # found by code search: the repository mentions the target, it is not proven to be the target's
+            return False, "repository only mentions the target (code search), download_mentions is off"
         return True
 
     async def handle_event(self, event):

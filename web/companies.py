@@ -111,6 +111,15 @@ def attach_scans(company_id, names):
     return rebuild(company_id)
 
 
+def detach_scans(company_id, names):
+    """Unlinks scans from a company and rebuilds its registry and timeline from the scans left (no alerts):
+    findings seen only in the detached scans leave the registry, the Findings and the Assets views."""
+    store.get_company(company_id)
+    for name in names:
+        store.unlink_scan(str(name), company_id)
+    return rebuild(company_id)
+
+
 # Bump when the finding key or status of aggregated findings changes (e.g. v2: TECHNOLOGY keyed by the technology,
 # not its host; manual status overrides): registries built by an older version are rebuilt once, without alerts -
 # otherwise the next scan would report every re-keyed finding as new.

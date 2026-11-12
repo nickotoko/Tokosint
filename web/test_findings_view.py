@@ -101,3 +101,26 @@ def test_override_false_hides_and_historical_downgrades(db):
     res = findings.company_findings([co["id"]])
     assert all(f["data"] != "a:3389" for f in res["findings"])
     assert res["total"] == 1
+
+
+def test_company_finding_full_card(db):
+    # the drill-down merges the whole cached records of the finding over the company's scans
+    login1 = dict(_finding("URL", "https://a/login", "high", "historical", sources=["gowitness"]),
+                  contexts=[{"module": "gowitness", "context": "screenshot of https://a/login"}],
+                  details={"title": "Sign in"}, on=[], via=[], false_reasons=[], scan_date=1700000000.0)
+    login2 = dict(_finding("URL", "https://a/login", "medium", "valid", sources=["httpx"], ports=[443]),
+                  contexts=[{"module": "httpx", "context": "httpx visited https://a/login"}],
+                  details={}, on=[], via=[], false_reasons=[], scan_date=1710000000.0, last_seen=1709000000.0)
+    other = _finding("OPEN_TCP_PORT", "a:3389", "high")
+    co = _company_with_scans("Acme", {"s1": [login1, other], "s2": [login2]})
+    card = findings.company_finding(co["id"], "URL", "https://a/login")
+    assert card["status"] == "valid" and set(card["scans"]) == {"s1", "s2"}
+    assert set(card["sources"]) == {"gowitness", "httpx"} and card["ports"] == [443]
+    assert [c["module"] for c in card["contexts"]] == ["gowitness", "httpx"]
+    assert card["details"]["title"] == "Sign in"
+    assert card["last_seen"] == 1709000000.0 and card["scan_date"] == 1710000000.0
+    assert card["risk"]  # risk recomputed on the merged record
+    assert findings.company_finding(co["id"], "URL", "https://a/missing") is None
+    # another company does not see it
+    co2 = _company_with_scans("Other", {"s3": []})
+    assert findings.company_finding(co2["id"], "URL", "https://a/login") is None

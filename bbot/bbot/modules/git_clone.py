@@ -21,6 +21,11 @@ class git_clone(github):
             "",
             description="Folder to clone repositories to. If not specified, cloned repositories will be deleted when the scan completes, to minimize disk usage.",
         )
+        download_mentions: bool = Field(
+            False,
+            description="Also download repositories that only mention the target (tagged code-mention by "
+            "github_codesearch): adblock lists, API clients... - slow and mostly unrelated",
+        )
 
     deps_apt = ["git"]
 
@@ -35,6 +40,9 @@ class git_clone(github):
     async def filter_event(self, event):
         if event.type == "CODE_REPOSITORY" and "git" not in event.tags:
             return False, "event is not a git repository"
+        if "code-mention" in event.tags and not self.config.get("download_mentions", False):
+            # found by code search: the repository mentions the target, it is not proven to be the target's
+            return False, "repository only mentions the target (code search), download_mentions is off"
         return True
 
     async def handle_event(self, event):

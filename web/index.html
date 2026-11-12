@@ -137,6 +137,11 @@
   th.sortable { cursor: pointer; } th.sortable:hover { color: var(--ink); }
   tbody tr:nth-child(even) { background: var(--row); }
   tbody tr.click { cursor: pointer; }
+  #dlg-body dd { overflow-wrap: anywhere; }
+  table.linked { width: 100%; border-collapse: collapse; margin: 4px 0 8px; }
+  table.linked td { padding: 4px 8px 4px 0; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  table.linked td.seen { white-space: nowrap; width: 1%; }
+  table.linked td:last-child { text-align: right; width: 1%; }
   tbody tr.click:hover { background: var(--accent-weak); }
   tr:last-child td { border-bottom: 0; }
   td.name, td.data { font-family: var(--mono); word-break: break-all; }
@@ -314,12 +319,12 @@
     <button id="tab-findings" class="on">Findings</button>
     <button id="tab-assets">Assets</button>
     <button id="tab-results">Scans</button>
+    <button id="tab-companies">Companies</button>
     <button id="tab-shots">Screenshots</button>
   </nav>
   <div class="gear-wrap">
     <button id="gear" title="Settings">⚙</button>
     <div class="multi-panel" id="gear-menu" hidden>
-      <button class="menu-item" id="tab-companies">Companies</button>
       <button class="menu-item" id="tab-sources">Sources</button>
       <button class="menu-item" id="tab-keys">Keys</button>
       <button class="menu-item" id="tab-howto">How it works</button>
@@ -676,7 +681,22 @@
   </section>
 
   <section id="view-keys" hidden>
-    <div class="panel" id="tg-panel">
+    <div class="bar">
+      <input type="search" id="k-q" placeholder="Search by source…" />
+      <select id="k-state">
+        <option value="">all</option>
+        <option value="set">set</option>
+        <option value="unset">not set</option>
+        <option value="need">required but not set</option>
+      </select>
+      <span class="count" id="k-count"></span>
+    </div>
+    <div class="tablewrap"><table id="k-table" class="fixed"><colgroup><col class="c-name"><col><col class="c-key"><col class="c-act"></colgroup><thead><tr>
+      <th>Source</th><th>Description</th><th>Key</th><th></th>
+    </tr></thead><tbody id="k-body"></tbody></table></div>
+    <div class="count" style="margin-top:10px">Keys are stored in <code>config/secrets.yml</code> (mode 600) and are picked up
+      by the next scan. Values are never sent back to the UI, only a mask.</div>
+    <div class="panel" id="tg-panel" style="margin-top:18px">
       <h3>Telegram alerts</h3>
       <div class="hint">One summary message per company scan, only when new valid findings of the company's alert types
         appear. Create a bot with @BotFather, add it to a chat and put the chat id here (a company may override it).</div>
@@ -710,21 +730,6 @@
         <span class="muted" id="px-msg"></span>
       </div>
     </div>
-    <div class="bar">
-      <input type="search" id="k-q" placeholder="Search by source…" />
-      <select id="k-state">
-        <option value="">all</option>
-        <option value="set">set</option>
-        <option value="unset">not set</option>
-        <option value="need">required but not set</option>
-      </select>
-      <span class="count" id="k-count"></span>
-    </div>
-    <div class="tablewrap"><table id="k-table" class="fixed"><colgroup><col class="c-name"><col><col class="c-key"><col class="c-act"></colgroup><thead><tr>
-      <th>Source</th><th>Description</th><th>Key</th><th></th>
-    </tr></thead><tbody id="k-body"></tbody></table></div>
-    <div class="count" style="margin-top:10px">Keys are stored in <code>config/secrets.yml</code> (mode 600) and are picked up
-      by the next scan. Values are never sent back to the UI, only a mask.</div>
   </section>
 </main>
 
@@ -813,6 +818,12 @@
     <div class="hint">Alert types (none checked = all types):</div>
     <div class="srcgrid" id="co-types"></div>
     <input type="text" id="co-chat" placeholder="chat id override (optional)" style="margin-top:8px" />
+    <div id="co-linked-wrap" hidden>
+      <label>Linked scans</label>
+      <div class="hint">Detaching keeps the scan files; the registry and timeline are rebuilt from the scans left, without
+        alerts, and the scan becomes free to attach again.</div>
+      <div id="co-linked"></div>
+    </div>
     <label>Existing scans</label>
     <div class="hint">Scans not linked to any company; the ones whose targets match the company's are checked.
       On save they are attached and the timeline is rebuilt in chronological order, without alerts.</div>
@@ -1057,7 +1068,7 @@ function show(which) {
   for (const t of ["findings", "assets", "results", "companies", "shots", "sources", "keys", "howto"]) {
     $("#tab-" + t).classList.toggle("on", t === which);
   }
-  $("#gear").classList.toggle("on", ["companies", "sources", "keys", "howto"].includes(which));
+  $("#gear").classList.toggle("on", ["sources", "keys", "howto"].includes(which));
   if (which === "keys") { loadKeys(); loadTelegram(); loadProxy(); }
   if (which === "shots") loadShots();
   if (which === "companies") loadCompanies();
@@ -1080,13 +1091,13 @@ $("#tab-findings").onclick = () => show("findings");
 $("#tab-companies").onclick = () => show("companies");
 $("#tab-howto").onclick = () => show("howto");
 $("#tab-shots").onclick = () => show("shots");
-// settings gear: Companies / Sources / Keys / How it works + theme + language live here
+// settings gear: Sources / Keys / How it works + theme + language live here
 $("#gear").onclick = (e) => { e.stopPropagation(); $("#gear-menu").hidden = !$("#gear-menu").hidden; };
 document.addEventListener("click", (e) => { const g = $(".gear-wrap"); if (g && !g.contains(e.target)) $("#gear-menu").hidden = true; });
-["tab-companies", "tab-sources", "tab-keys", "tab-howto"].forEach((id) => {
+["tab-sources", "tab-keys", "tab-howto"].forEach((id) => {
   const prev = $("#" + id).onclick; $("#" + id).onclick = () => { $("#gear-menu").hidden = true; prev(); };
 });
-const HASH_TAB = { "#findings": "findings", "#assets": "assets", "#scans": "results", "#howto": "howto", "#screenshots": "shots" };
+const HASH_TAB = { "#findings": "findings", "#assets": "assets", "#scans": "results", "#companies": "companies", "#howto": "howto", "#screenshots": "shots" };
 show(HASH_TAB[location.hash] || "findings");  // Findings is the default landing section
 
 // ---- how it works: BBOT's chord graph of modules <-> event types (the same Vega spec, our modules) ----
@@ -1802,7 +1813,7 @@ function renderChains(out, d, a) {
 }
 
 // ---------- manual status ----------
-function statusForm(a) {
+function statusForm(a, onChange) {
   const box = el("div", "statusform");
   box.appendChild(el("h3", null, "Change status"));
   const o = a.status_override;
@@ -1822,7 +1833,7 @@ function statusForm(a) {
   const send = (status) => {
     save.disabled = revert.disabled = true; msg.textContent = "";
     postJSON("/api/status/set", { scan: assetScan(a), type: a.type, data: a.data, status, note: note.value.trim() })
-      .then(() => { $("#dlg").close(); reloadResults(); })
+      .then(() => { $("#dlg").close(); (onChange || reloadResults)(); })
       .catch((e) => { msg.textContent = e.message; })
       .finally(() => { save.disabled = revert.disabled = false; });
   };
@@ -1837,7 +1848,7 @@ function statusForm(a) {
   return box;
 }
 
-function openAsset(a) {
+function openAsset(a, onChange) {
   $("#dlg-name").textContent = a.data.length > 80 ? a.data.slice(0, 80) + "…" : a.data;
   const b = $("#dlg-body"); b.innerHTML = "";
   const dl = el("dl");
@@ -1896,7 +1907,7 @@ function openAsset(a) {
   { const d = el("div"); chips(d, a.tags || [], "flag"); row("Tags", d); }
   b.appendChild(dl);
   b.appendChild(chainBox(a));
-  b.appendChild(statusForm(a));
+  b.appendChild(statusForm(a, onChange));
   $("#dlg").showModal();
 }
 
@@ -2261,10 +2272,40 @@ function openCompany(c) {
   renderTypeGrid(c ? c.alert_types : ["DNS_NAME", "IP_ADDRESS", "OPEN_TCP_PORT", "FINDING"]);
   $("#co-sched-wrap").hidden = !c; $("#co-delete").hidden = !c;
   if (c) renderSchedules(c);
+  renderLinkedScans(c);
   // auto-check matching scans only for a new company; when editing they are highlighted, not checked
   CO_SCANS_TOUCHED = !!c; $("#co-scans").innerHTML = "Loading…"; $("#co-err").className = "err";
   loadFreeScans().then(() => renderScanPicker($("#co-scans"), $("#co-targets").value, !c));
   $("#dlg-company").showModal();
+}
+const fmtWhen = (ts) => ts ? new Date(ts * 1000).toISOString().slice(0, 16).replace("T", " ") : "—";
+// scans linked to the company: date first, then the name; Detach unlinks one and rebuilds the registry
+function renderLinkedScans(c) {
+  const box = $("#co-linked"); box.innerHTML = "";
+  const linked = (c && c.linked) || [];
+  $("#co-linked-wrap").hidden = !c;
+  if (!linked.length) { box.appendChild(el("div", "muted", "No scans linked yet.")); return; }
+  const tbl = el("table", "linked"); const tb = el("tbody");
+  for (const s of linked) {
+    const tr = el("tr");
+    tr.appendChild(el("td", "seen", fmtWhen(s.started_at)));
+    tr.appendChild(el("td", "name", s.scan));
+    tr.appendChild(el("td", "muted", s.ingested_at ? `${s.valid_count} valid · +${s.new_count} new` + (s.baseline ? " (baseline)" : "") : "not ingested"));
+    const td = el("td"); const btn = el("button", "btn sm danger", "Detach");
+    btn.onclick = () => {
+      if (!confirm(`Detach scan ${s.scan} from ${c.name}? Its files are kept; the registry and timeline are rebuilt without it.`)) return;
+      btn.disabled = true;
+      postJSON("/api/companies/detach", { id: c.id, scans: [s.scan] })
+        .then(() => loadCompanies()).then(() => {
+          const fresh = COMPANIES.find((x) => x.id === c.id); if (fresh) openCompany(fresh);
+          $("#co-err").className = "muted"; $("#co-err").textContent = `detached ${s.scan}`;
+          loadScanList();
+        })
+        .catch((e) => { $("#co-err").textContent = e.message; btn.disabled = false; });
+    };
+    td.appendChild(btn); tr.appendChild(td); tb.appendChild(tr);
+  }
+  tbl.appendChild(tb); box.appendChild(tbl);
 }
 let CO_SCANS_TOUCHED = false;
 $("#co-scans").addEventListener("change", () => { CO_SCANS_TOUCHED = true; });
@@ -2331,7 +2372,7 @@ function renderScanPicker(box, targets, autoCheck) {
     cb.checked = autoCheck ? match : keep.has(s.name);
     lb.appendChild(cb);
     const when = new Date((s.started_at || s.mtime) * 1000).toISOString().slice(0, 16).replace("T", " ");
-    lb.appendChild(document.createTextNode(`${s.name} · ${when} · ${(s.targets || []).join(", ") || "?"} · ${s.events} events`));
+    lb.appendChild(document.createTextNode(`${when} · ${s.name} · ${(s.targets || []).join(", ") || "?"} · ${s.events} events`));
     if (match) lb.appendChild(el("span", "chip in", "targets match"));
     box.appendChild(lb);
   }
@@ -2400,7 +2441,9 @@ function renderFindings() {
   sortFindings(rows);
   markSortHeaders($("#f-table"), fSort);
   for (const f of rows) {
-    const tr = el("tr", f.risk ? "risk-" + f.risk : null);
+    const tr = el("tr", "click" + (f.risk ? " risk-" + f.risk : ""));
+    tr.title = "open the full description";
+    tr.onclick = () => openFinding(f);
     const tdR = el("td"); if (f.risk) { const b = riskBadge(f.risk); b.title = (f.risk_reasons || []).join("\n"); tdR.appendChild(b); } tr.appendChild(tdR);
     tr.appendChild(el("td", "muted", f.company));
     const tdK = el("td"); tdK.appendChild(el("span", "chip", f.category_label || f.category || f.type));
@@ -2425,6 +2468,20 @@ function renderFindings() {
   const total = FINDINGS.facets.total || 0;
   $("#f-count").textContent = `${rows.length} of ${total}`
     + (fSelected.size ? ` · ${fSelected.size} compan${fSelected.size > 1 ? "ies" : "y"}` : " · all companies");
+}
+// drill-down: the full card of a finding (the same card as in Scans / Assets), merged over the company's scans
+let fCardReq = 0;
+function openFinding(f) {
+  const my = ++fCardReq;
+  const q = new URLSearchParams({ company: f.company_id, type: f.type, data: f.data });
+  fetch("/api/finding?" + q).then((r) => r.json().then((d) => { if (!r.ok) throw new Error(d.error || r.statusText); return d; }))
+    .then((card) => { if (my === fCardReq) openAsset(card, loadFindings); })
+    .catch((e) => {
+      if (my !== fCardReq) return;
+      // not cached (an old scan): show what the findings row itself has
+      openAsset(Object.assign({}, f, { screenshots: [], contexts: [], false_reasons: [] }), loadFindings);
+      $("#dlg-body").prepend(el("div", "err", "Full description unavailable: " + e.message));
+    });
 }
 function httpStatusChips(td, codes) {
   for (const code of codes) {

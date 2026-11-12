@@ -50,6 +50,8 @@ OWNER_UNVERIFIED_TAG = "owner-unverified"
 THIRD_PARTY_TAG = "third-party"
 # ipowner: the address is the front of someone else's service -> third-party (see bbot/modules/internal/ipowner.py)
 IP_PROXY_TAG = "ip-proxy"
+# github_codesearch: a repository that only mentions the target in its code -> third-party (not a target asset)
+CODE_MENTION_TAG = "code-mention"
 
 
 class validity(BaseInterceptModule):
@@ -92,7 +94,8 @@ class validity(BaseInterceptModule):
       directly (not through the name): `foo.other.example:443` from a search for target.example is false.
 
     Tag `third-party`: an out-of-scope name from a target DNS record (MX/NS/CNAME... to a provider), an IP address
-    tagged `ip-proxy` by ipowner (reached through a CNAME to a provider, an anti-DDoS/CDN network) and their
+    tagged `ip-proxy` by ipowner (reached through a CNAME to a provider, an anti-DDoS/CDN network), a repository
+    that only mentions the target (`code-mention`, github_codesearch) and their
     out-of-scope descendants - the relation is valid ("the target uses it"), but it is third-party
     infrastructure, not a target asset.
 
@@ -402,6 +405,7 @@ class validity(BaseInterceptModule):
         # anti-DDoS/CDN network) together with what is found on it
         third_party = status != FALSE and (
             (event.type == "IP_ADDRESS" and IP_PROXY_TAG in event.tags)
+            or CODE_MENTION_TAG in event.tags
             or (
                 event.scope_distance > 0
                 and ((event.type in DNS_NAME_TYPES and getattr(event.module, "_type", "") == "DNS") or parent_state[4])

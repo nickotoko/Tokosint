@@ -351,3 +351,26 @@ def test_old_screenshot_takes_the_code_of_its_url(tmp_env):
     (d / "gowitness" / "screenshots" / "a.jpeg").write_bytes(b"\xff\xd8\xff")
     s = scans.list_screenshots()["shots"][0]
     assert (s["status_code"], s["code_from"]) == (301, "http")
+
+
+def test_detach_scan_rebuilds_registry(tmp_env):
+    write_scan(tmp_env, "s1", BASE_EVENTS)
+    extra = BASE_EVENTS + [ev("D:9", "DNS_NAME", "only-s2.acme.example", module="crt", host="only-s2.acme.example")]
+    write_scan(tmp_env, "s2", extra)
+    co = store.save_company({"name": "Acme", "targets": ["acme.example"]})
+    companies.attach_scans(co["id"], ["s1", "s2"])
+    has = lambda data: any(a["data"] == data for a in store.timeline(co["id"])["events"])  # noqa: E731
+    assert has("only-s2.acme.example")
+
+    companies.detach_scans(co["id"], ["s2"])
+    assert [s["scan"] for s in store.company_scans(co["id"])] == ["s1"]
+    assert not has("only-s2.acme.example"), "a finding seen only in the detached scan leaves the timeline"
+    assert has("www.acme.example")
+    assert store.scan_link("s2") is None  # free to attach again (to any company)
+    with pytest.raises(store.StoreError):
+        companies.detach_scans(co["id"], ["s2"])  # not linked any more
+    other = store.save_company({"name": "Other", "targets": []})
+    with pytest.raises(store.StoreError):
+        companies.detach_scans(other["id"], ["s1"])  # belongs to another company
+    companies.attach_scans(other["id"], ["s2"])
+    assert store.scan_link("s2")["company_id"] == other["id"]

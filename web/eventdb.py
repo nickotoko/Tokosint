@@ -296,6 +296,26 @@ def has_findings(name):
         )
 
 
+def finding_for_scans(scan_names, etype, data):
+    """[(scan, finding dict)] of one cached finding (type, value) in the given scans."""
+    names = list(scan_names)
+    if not names:
+        return []
+    with closing(store.connect()) as c:
+        qmarks = ",".join("?" * len(names))
+        rows = c.execute(
+            f"SELECT scan, finding FROM scan_findings WHERE scan IN ({qmarks}) AND type = ? AND data = ?",
+            [*names, etype, data],
+        ).fetchall()
+    out = []
+    for r in rows:
+        try:
+            out.append((r["scan"], json.loads(r["finding"])))
+        except ValueError:
+            continue
+    return out
+
+
 def findings_for_scans(scan_names):
     """[(scan, finding dict)] for the cached findings of the given scans."""
     names = list(scan_names)

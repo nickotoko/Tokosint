@@ -153,6 +153,8 @@ class Handler(BaseHTTPRequestHandler):
                     co["schedules"] = [
                         s for s in schedules if s["company_id"] == co["id"]
                     ]
+                    # linked scans for the company dialog (date, name, ingest result; Detach)
+                    co["linked"] = store.company_scans(co["id"])
                 return self._send_json(out)
             if route.startswith("/api/timeline/"):
                 cid = int(route[len("/api/timeline/") :])
@@ -172,6 +174,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json(findings.company_findings(
                     ids, status=query.get("status"), risk_level=query.get("risk"),
                     category=query.get("category"), q=query.get("q")))  # fmt: skip
+            if route == "/api/finding":
+                # the Findings tab drill-down: the full card of one finding of a company
+                # (?company=<id>&type=<event type>&data=<value>)
+                cid = str(query.get("company", ""))
+                if not cid.isdigit() or not query.get("type") or query.get("data") is None:
+                    return self._send_json({"error": "company, type and data are required"}, 400)
+                card = findings.company_finding(int(cid), query.get("type"), query.get("data"))
+                if card is None:
+                    return self._send_json({"error": "finding not found"}, 404)
+                return self._send_json(card)
             if route.startswith("/api/company-assets/"):
                 # the Assets tab: all assets of a company (the Scans view at company scope)
                 cid = int(route[len("/api/company-assets/") :])
@@ -307,6 +319,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json(
                     store.save_company(payload, cid, parse_targets=scans.parse_targets)
                 )
+            if route == "/api/companies/detach":
+                names = payload.get("scans") or []
+                if not isinstance(names, list) or not names:
+                    return self._send_json({"error": "scans must be a non-empty list"}, 400)
+                return self._send_json(companies.detach_scans(int(payload["id"]), names))
             if route == "/api/companies/delete":
                 store.delete_company(int(payload.get("id") or 0))
                 return self._send_json({"ok": True})
