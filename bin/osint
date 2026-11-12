@@ -6,4 +6,5 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 require_install
 check_secrets
 check_home_ownership
+ensure_module_deps
 exec "$ROOT/bbot/.venv/bin/bbot" -o "$ROOT/scans" "$@"

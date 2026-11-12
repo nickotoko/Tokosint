@@ -85,3 +85,20 @@ check_home_ownership() {
     echo
   } >&2
 }
+
+ensure_module_deps() {
+  # pip dependencies of the modules (deps_pip): scans run with --no-deps and `uv sync` removes these packages (they are
+  # not in uv.lock), so a missing one is installed here instead of failing the module ("No module named 'asyncpg'")
+  local py="$ROOT/bbot/.venv/bin/python" missing uv
+  missing="$("$py" -I "$ROOT/tools/module_deps.py" "$ROOT/bbot/bbot/modules" 2>/dev/null)" || return 0
+  [ -z "$missing" ] && return 0
+  echo "Installing missing module dependencies: $(echo $missing)" >&2
+  uv="$(command -v uv || echo "$HOME/.local/bin/uv")"
+  if [ -x "$uv" ]; then
+    # shellcheck disable=SC2086
+    "$uv" pip install -q --python "$py" $missing >&2 || echo "! installing module dependencies failed" >&2
+  else
+    # shellcheck disable=SC2086
+    "$py" -m pip install -q $missing >&2 || echo "! installing module dependencies failed" >&2
+  fi
+}

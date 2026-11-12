@@ -1,4 +1,5 @@
 import json
+import time
 
 from bbot.modules.base import BaseInterceptModule
 from bbot.core.config.models import BaseModuleConfig, Field
@@ -111,7 +112,12 @@ class validity(BaseInterceptModule):
                              (web/validity.py)
 
     A source module may override the freshness of a single event with a `freshness-current` /
-    `freshness-historical` tag (e.g. based on a record's last_seen date).
+    `freshness-historical` tag (e.g. FOFA: the result is also in a search limited to recent observations).
+
+    Recent observation (`recent_days`): a finding of a historical source whose last_seen (the source's own date of
+    the observation, D-028) is at most `recent_days` days before the scan start is current - the index saw the port /
+    name / service a few days ago, so it is treated as live (tag `seen-recently`). Older dates or no date - historical.
+    The checks still apply: a recently seen name that does not resolve now is historical.
     """
 
     watched_events = ["*"]
@@ -141,6 +147,11 @@ class validity(BaseInterceptModule):
         http_check: bool = Field(
             True, description="Check URLs by the live HTTP status: 404/410 -> historical, any other answer -> verified"
         )
+        recent_days: int = Field(
+            7,
+            description="A finding of a historical source that the source itself saw at most this many days before "
+            "the scan (its last_seen date) is current (valid); 0 turns this off",
+        )
         seed_status_file: str = Field(
             "",
             description="JSON {seed data: valid|historical} - the status seeds already have (a scan that enriches an "
@@ -166,6 +177,10 @@ class validity(BaseInterceptModule):
                     self.seed_status = {str(k): str(v) for k, v in json.load(fh).items()}
             except (OSError, ValueError) as e:
                 return False, f"cannot read seed_status_file {seed_status_file}: {e}"
+        try:
+            self.recent_days = max(0, float(self.config.get("recent_days", 7) or 0))
+        except (TypeError, ValueError):
+            return False, f"recent_days must be a number of days, got {self.config.get('recent_days')!r}"
         self.promote_resolved = self.config.get("promote_resolved", "in_scope")
         if self.promote_resolved not in PROMOTE_POLICIES:
             return False, f"promote_resolved must be one of {PROMOTE_POLICIES}, got {self.promote_resolved!r}"
@@ -206,7 +221,19 @@ class validity(BaseInterceptModule):
             # a module without declared freshness is conservatively treated as an archive
             self.debug(f"Module {module} has no meta freshness, treating {event} as historical")
             level = "historical"
+        if level == "historical" and self.seen_recently(event):
+            event.add_tag("seen-recently")
+            return VALID
         return FRESHNESS[level]
+
+    def seen_recently(self, event):
+        """The source's own date of the observation is within recent_days of the scan start."""
+        seen = getattr(event, "last_seen", None)
+        if not self.recent_days or seen is None:
+            return False
+        start = self.scan.start_time.timestamp() if self.scan.start_time is not None else time.time()
+        # a date slightly ahead of the scan (source clock / time zone) is still recent
+        return start - seen <= self.recent_days * 86400
 
     # --- stage 2 checks ---
 

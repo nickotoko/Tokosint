@@ -1,4 +1,5 @@
 import base64
+import datetime
 import ipaddress
 from urllib.parse import urlparse
 
@@ -19,6 +20,13 @@ class fofa(shared_hosting_filter, BaseModule):
     - IP_ADDRESS -> per-port products of the IP (/host/<ip>). The IP is the parent of what is found there, and
       IPs of someone else's infrastructure (CDN, anti-DDoS front, cloud, third-party providers of the target) are
       skipped: their ports belong to the provider, not to the target.
+
+    Freshness. FOFA is an index (historical), but it knows when it last saw a service. A finding FOFA saw within
+    `modules.validity.recent_days` of the scan is current (valid) - see validity:
+    - host details and paid search tiers give the date (`update_time` / `lastupdatetime`) -> the event's last_seen;
+    - other tiers may not request `lastupdatetime` (error 820001). Then the same search is repeated with
+      `after="<scan date - recent_days>"` (one more query per page): results in both are tagged `freshness-current`,
+      the rest stay historical. FOFA dates are in China time (UTC+8).
 
     API reference: https://en.fofa.info/api
     """
@@ -42,6 +50,12 @@ class fofa(shared_hosting_filter, BaseModule):
         host_details: bool = Field(
             True, description="Query /host/<ip> for per-port products of IPs (not of CDN / proxy / third-party IPs)"
         )
+        recent_query: bool = Field(
+            True,
+            description="When the key may not request lastupdatetime, repeat each domain search with after=<scan date "
+            "- validity recent_days> to tell findings FOFA saw recently (valid) from old ones (historical); "
+            "spends one more query per page",
+        )
         retries: Optional[int] = Field(
             None, description="How many times to retry API requests. Overrides the global web.api_retries setting."
         )
@@ -57,6 +71,10 @@ class fofa(shared_hosting_filter, BaseModule):
     no_field_permission = "820001"
     # validity: the IP belongs to a provider the target uses (its MX / NS / SaaS), not to the target
     foreign_ip_tags = ("third-party",)
+    # FOFA reports dates as "YYYY-MM-DD HH:MM:SS" in China Standard Time
+    fofa_tz = datetime.timezone(datetime.timedelta(hours=8))
+    # validity's default for modules.validity.recent_days
+    default_recent_days = 7
 
     async def setup(self):
         self._search_fields = self.search_fields
@@ -118,25 +136,72 @@ class fofa(shared_hosting_filter, BaseModule):
     def make_query(self, event):
         return f'domain="{event.data}" || cert.subject.cn="{event.data}" || cert.subject.cn*="*.{event.data}"'
 
+    @property
+    def recent_days(self):
+        """How old a FOFA observation may be and still count as current (validity's setting, one knob for all)."""
+        validity = (self.scan.config.get("modules", {}) or {}).get("validity", {}) or {}
+        try:
+            return max(0, int(validity.get("recent_days", self.default_recent_days)))
+        except (TypeError, ValueError):
+            return self.default_recent_days
+
+    def recent_cutoff(self):
+        """The first day (China time, as FOFA counts) that is still "recent" for the after= filter."""
+        start = self.scan.start_time or datetime.datetime.now(datetime.timezone.utc)
+        return (start.astimezone(self.fofa_tz) - datetime.timedelta(days=self.recent_days)).strftime("%Y-%m-%d")
+
+    @classmethod
+    def fofa_time(cls, value):
+        """A FOFA date string (China time) -> aware datetime; anything else is passed to last_seen as is."""
+        if isinstance(value, str):
+            try:
+                parsed = datetime.datetime.fromisoformat(value.strip().replace(" ", "T", 1))
+            except ValueError:
+                return value or None
+            return parsed if parsed.tzinfo else parsed.replace(tzinfo=cls.fofa_tz)
+        return value
+
+    @staticmethod
+    def _result_key(result):
+        return tuple(str(x or "") for x in result[:3])
+
     async def handle_domain(self, event):
         domain = event.data
         query = self.make_query(event)
-        context = f'{{module}} searched FOFA for "{query}" and found {{event.type}}: {{event.data}}'
-        async for result in self.search(query):
+        results = [r async for r in self.search(query)]
+        recent, cutoff = set(), None
+        if (
+            results
+            and self._search_fields == self.base_search_fields
+            and self.recent_days
+            and self.config.get("recent_query", True)
+        ):
+            # no lastupdatetime on this tier: ask FOFA which of these it saw since the cutoff
+            cutoff = self.recent_cutoff()
+            async for r in self.search(f'({query}) && after="{cutoff}"'):
+                if isinstance(r, (list, tuple)) and len(r) >= 3:
+                    recent.add(self._result_key(r))
+        for result in results:
             if not isinstance(result, (list, tuple)) or len(result) < 3:
                 self.debug(f"Unexpected FOFA result format: {result}")
                 continue
             host_or_url, ip, port = result[:3]
             cert_cn = result[3] if len(result) > 3 else ""
-            seen = result[4] if len(result) > 4 else None
+            seen = self.fofa_time(result[4] if len(result) > 4 else None)
             if not port:
                 continue
+            context = f'{{module}} searched FOFA for "{query}" and found {{event.type}}: {{event.data}}'
+            tags = []
+            if self._result_key(result) in recent:
+                tags = ["freshness-current", "seen-recently"]
+                context += f" (seen by FOFA since {cutoff})"
             hostname = self._extract_hostname(str(host_or_url or ""))
             if hostname and self.name_matches(hostname, domain):
                 if hostname != domain:
-                    await self.emit_event(hostname, "DNS_NAME", parent=event, context=context, last_seen=seen)
+                    await self.emit_event(hostname, "DNS_NAME", parent=event, context=context, last_seen=seen,
+                                          tags=tags)  # fmt: skip
                 await self.emit_event(self.helpers.make_netloc(hostname, port), "OPEN_TCP_PORT", parent=event,
-                                      context=context, last_seen=seen)  # fmt: skip
+                                      context=context, last_seen=seen, tags=tags)  # fmt: skip
             elif ip and (self.cert_matches(cert_cn, domain) or self.scan.in_target(ip)):
                 # a server (or a foreign name) presenting the target's certificate, or an address of the target
                 # itself: report the address only
@@ -145,8 +210,8 @@ class fofa(shared_hosting_filter, BaseModule):
                     "OPEN_TCP_PORT",
                     parent=event,
                     last_seen=seen,
-                    context=f'{{module}} searched FOFA for "{query}" and found {{event.type}}: {{event.data}}'
-                    + (f" serving a certificate for {cert_cn}" if cert_cn else ""),
+                    tags=tags,
+                    context=context + (f" serving a certificate for {cert_cn}" if cert_cn else ""),
                 )
             else:
                 self.debug(f"Skipping FOFA result unrelated to {domain}: {host_or_url} ({ip}:{port}, cn={cert_cn!r})")
@@ -212,7 +277,7 @@ class fofa(shared_hosting_filter, BaseModule):
                 continue
             netloc = self.helpers.make_netloc(ip, port)
             context = f"{{module}} queried FOFA host details for {ip} and found {{event.type}}: {{event.data}}"
-            seen = port_info.get("update_time") or j.get("update_time")
+            seen = self.fofa_time(port_info.get("update_time") or j.get("update_time"))
             await self.emit_event(netloc, "OPEN_TCP_PORT", parent=event, context=context, last_seen=seen)
             for product in port_info.get("products", []) or []:
                 technology = product.get("product", "")
