@@ -3,6 +3,7 @@
 import eventdb
 import findings
 import pytest
+import risk
 import store
 
 import scans
@@ -15,6 +16,13 @@ def db(tmp_path, monkeypatch):
     store.init()
     eventdb.init()
     return tmp_path
+
+
+@pytest.fixture
+def cached_risk(monkeypatch):
+    """The synthetic findings below carry made-up risk levels: keep them instead of the real rules."""
+    monkeypatch.setattr(findings.risk, "assess",
+                        lambda f, cfg=None: (f.get("risk"), f.get("risk_reasons") or [], f.get("risk_category")))  # fmt: skip
 
 
 def _finding(type_, data, risk, status="valid", category="exposure", **extra):
@@ -35,7 +43,7 @@ def _company_with_scans(name, scan_findings):
     return co
 
 
-def test_union_dedup_worst_risk_and_best_status(db):
+def test_union_dedup_worst_risk_and_best_status(db, cached_risk):
     co = _company_with_scans("Acme", {
         "s1": [_finding("URL", "https://a/login", "high", "historical", sources=["gowitness"]),
                _finding("OPEN_TCP_PORT", "a:3389", "high", "valid")],
@@ -51,7 +59,7 @@ def test_union_dedup_worst_risk_and_best_status(db):
     assert res["total"] == 2  # login (deduped) + rdp port
 
 
-def test_filters(db):
+def test_filters(db, cached_risk):
     co = _company_with_scans(
         "Acme",
         {
@@ -124,3 +132,17 @@ def test_company_finding_full_card(db):
     # another company does not see it
     co2 = _company_with_scans("Other", {"s3": []})
     assert findings.company_finding(co2["id"], "URL", "https://a/login") is None
+
+
+def test_risk_comes_from_current_rules(db):
+    # the cache keeps the level of import time; the view re-assesses with web/risk.json, so a rule removed later
+    # (8443 is not a risk any more) applies to old scans at once
+    co = _company_with_scans("Acme", {"s1": [
+        _finding("OPEN_TCP_PORT", "a:8443", "medium", category="port", ports=[8443]),
+        _finding("OPEN_TCP_PORT", "a:3389", "low", category="port", ports=[3389]),
+    ]})  # fmt: skip
+    res = findings.company_findings([co["id"]])
+    by = {f["data"]: f for f in res["findings"]}
+    assert "a:8443" not in by
+    assert by["a:3389"]["risk"] == risk.assess({"type": "OPEN_TCP_PORT", "ports": [3389], "status": "valid"})[0]
+    assert by["a:3389"]["risk"] != "low"

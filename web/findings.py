@@ -141,6 +141,13 @@ def company_findings(
         cid = scan_company.get(scan)
         if cid is None:
             continue
+        # the level comes from the current rules (web/risk.json), not the one cached at import: a rule removed or
+        # lowered applies to old scans at once (D-030). A rule that adds risk to findings the cache skipped as
+        # risk-free needs the scan re-cached (scans.cache_findings).
+        level, reasons, kind = risk.assess(f)
+        if not level:
+            continue
+        f = dict(f, risk=level, risk_reasons=reasons, risk_category=kind)
         o = company_overrides.get(cid, {}).get((f["type"], str(f["data"])))
         if o is not None:
             f = _override_finding(f, o)

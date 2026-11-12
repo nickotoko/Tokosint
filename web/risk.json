@@ -65,9 +65,7 @@
       "500": "IKE / IPsec VPN",
       "5060": "SIP",
       "5061": "SIP over TLS",
-      "4172": "PCoIP / VMware Horizon (VDI)",
-      "8080": "alternative HTTP (often admin / dev)",
-      "8443": "alternative HTTPS (often admin)"
+      "4172": "PCoIP / VMware Horizon (VDI)"
     },
     "low": {
       "53": "DNS",
