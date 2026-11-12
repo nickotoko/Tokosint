@@ -313,6 +313,31 @@
   "credits": "кредиты",
   "requests": "запросы",
   "Risk": "Риск",
+  "Where": "Где",
+  "Seen": "Замечен",
+  "Kind": "Тип",
+  "Scans": "Сканы",
+  "Assets": "Активы",
+  "all companies": "все компании",
+  "Export CSV": "Экспорт CSV",
+  "status: all": "статус: все",
+  "kind: all": "тип: все",
+  "sort: risk": "сортировка: риск",
+  "sort: company": "сортировка: компания",
+  "sort: kind": "сортировка: тип",
+  "manual": "вручную",
+  "Login / admin panel": "Логин / админ-панель",
+  "Exposed port": "Открытый порт",
+  "Exposed service": "Открытый сервис",
+  "Leak / secret": "Утечка / секрет",
+  "Vulnerability": "Уязвимость",
+  "Sensitive exposure": "Чувствительная экспозиция",
+  "— choose a company —": "— выберите компанию —",
+  "No assets for this company yet.": "У этой компании пока нет активов.",
+  "Loading… (large companies may take a moment)": "Загрузка… (крупные компании могут занять время)",
+  "Failed to load the company's assets.": "Не удалось загрузить активы компании.",
+  "Search value…": "Поиск по значению…",
+  "No risk findings yet. Login pages, exposed ports/services, vulnerabilities and leaks appear here once scans are imported — new scans import automatically; for older ones run tools/scan_db.py import --all.": "Находок с риском пока нет. Логин-страницы, открытые порты/сервисы, уязвимости и утечки появятся здесь после импорта сканов — новые сканы импортируются автоматически; для старых запустите tools/scan_db.py import --all.",
   "risk: any": "риск: любой",
   "risk: all": "риск: все",
   "critical": "критичный",
@@ -775,6 +800,26 @@
   [
    "^(\\d{3}) \\(first answer, before redirects\\)$",
    "$1 (первый ответ, до редиректов)"
+  ],
+  [
+   "^(\\d+) of (\\d+) · all companies$",
+   "$1 из $2 · все компании"
+  ],
+  [
+   "^(\\d+) of (\\d+) · (\\d+) company$",
+   "$1 из $2 · $3 компания"
+  ],
+  [
+   "^(\\d+) of (\\d+) · (\\d+) companies$",
+   "$1 из $2 · $3 компаний"
+  ],
+  [
+   "^companies: (\\d+)$",
+   "компании: $1"
+  ],
+  [
+   "^ports: (.*)$",
+   "порты: $1"
   ]
  ]
 }

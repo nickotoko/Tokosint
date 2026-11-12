@@ -17,6 +17,17 @@ from urllib.parse import urlparse
 RULES_FILE = Path(__file__).resolve().parent / "risk.json"
 LEVELS = ("critical", "high", "medium", "low")
 RANK = {None: 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
+# the kind of finding, for grouping/filtering in the Findings view (not the asset type). ports -> "port",
+# technologies -> "service", finding_severity -> "vuln"; findings/urls rules may set their own "category".
+CATEGORIES = {
+    "login": "Login / admin panel",
+    "port": "Exposed port",
+    "service": "Exposed service",
+    "leak": "Leak / secret",
+    "vuln": "Vulnerability",
+    "exposure": "Sensitive exposure",
+    "other": "Other",
+}
 _PORT_RE = re.compile(r":(\d{1,5})$")
 # a URL path rule matches a whole path segment start: /admin matches /admin, /admin/, /admin.php - not /administer
 _SEGMENT_END = re.compile(r"[/?#.\-_;]|$")
@@ -50,9 +61,10 @@ def _ports_of(f):
     return ports
 
 
-def _text_rules(items, text):
+def _text_rules(items, text, default_category):
     text = text.lower()
-    return [(r["level"], r["label"]) for r in items if r.get("match", "").lower() in text]
+    return [(r["level"], r["label"], r.get("category", default_category))
+            for r in items if r.get("match", "").lower() in text]  # fmt: skip
 
 
 def _url_rules(items, url):
@@ -65,12 +77,12 @@ def _url_rules(items, url):
         m = r.get("match", "").lower()
         i = path.find(m)
         if m and i >= 0 and _SEGMENT_END.match(path, i + len(m)):
-            out.append((r["level"], r["label"]))
+            out.append((r["level"], r["label"], r.get("category", "exposure")))
     return out
 
 
 def matches(f, cfg=None):
-    """All (level, reason) pairs the finding matches, regardless of its status."""
+    """All (level, reason, category) triples the finding matches, regardless of its status."""
     cfg = cfg if cfg is not None else rules()
     etype, data = f.get("type"), f.get("data")
     details = f.get("details") or {}
@@ -80,47 +92,58 @@ def matches(f, cfg=None):
             for port in _ports_of(f):
                 label = ports.get(str(port))
                 if label:
-                    out.append((level, f"port {port} open: {label}"))
+                    out.append((level, f"port {port} open: {label}", "port"))
     elif etype == "TECHNOLOGY":
-        name = data if isinstance(data, str) else str((data or {}).get("technology", ""))
-        out += [(lvl, f"{label} ({name})") for lvl, label in _text_rules(cfg.get("technologies") or [], name)]
+        name = (
+            data if isinstance(data, str) else str((data or {}).get("technology", ""))
+        )
+        out += [
+            (lvl, f"{label} ({name})", cat)
+            for lvl, label, cat in _text_rules(
+                cfg.get("technologies") or [], name, "service"
+            )
+        ]
     elif etype in ("FINDING", "VULNERABILITY"):
         text = f"{details.get('name', '')} {details.get('description', '')} {data if isinstance(data, str) else ''}"
-        out += _text_rules(cfg.get("findings") or [], text)
+        out += _text_rules(cfg.get("findings") or [], text, "vuln")
         sev = str(details.get("severity") or "").upper()
         level = (cfg.get("finding_severity") or {}).get(sev)
         if level:
-            out.append((level, f"{etype.lower()} of severity {sev.lower()}"))
+            out.append((level, f"{etype.lower()} of severity {sev.lower()}", "vuln"))
     elif etype == "URL":
         out += _url_rules(cfg.get("urls") or [], str(data or ""))
     return out
 
 
 def assess(f, cfg=None):
-    """(level or None, [reasons]) for an aggregated finding, given its status and ownership."""
+    """(level or None, [reasons], category or None) for an aggregated finding, given its status and ownership.
+
+    category is the kind of finding (login / port / service / leak / vuln / exposure) of its most severe match."""
     found = matches(f, cfg)
     if not found:
-        return None, []
+        return None, [], None
     status = f.get("status")
     tags = set(f.get("tags") or [])
     if status == "false" or "third-party" in tags or f.get("third_party"):
-        return None, []
-    level = max((lvl for lvl, _ in found), key=lambda x: RANK.get(x, 0))
+        return None, [], None
+    ordered = sorted(found, key=lambda x: -RANK.get(x[0], 0))
+    level = ordered[0][0]
+    category = ordered[0][2]
     reasons = []
-    for lvl, reason in sorted(found, key=lambda x: -RANK.get(x[0], 0)):
+    for _, reason, _cat in ordered:
         if reason not in reasons:
             reasons.append(reason)
     if status == "historical":
         level = _down(level)
         reasons.append("historical: may no longer be exposed")
-    return level, reasons
+    return level, reasons, category
 
 
 def annotate(findings):
-    """Adds risk and risk_reasons to aggregated findings (in place); returns findings."""
+    """Adds risk, risk_reasons and risk_category to aggregated findings (in place); returns findings."""
     cfg = rules()
     for f in findings:
-        f["risk"], f["risk_reasons"] = assess(f, cfg)
+        f["risk"], f["risk_reasons"], f["risk_category"] = assess(f, cfg)
     return findings
 
 

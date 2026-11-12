@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Tokosint MCP server: read scan data and run scans over the Model Context Protocol.
+#   bin/mcp              stdio transport (a local MCP client launches this as a subprocess)
+#   bin/mcp http [port]  streamable-HTTP on 127.0.0.1:<port> (default 8778), e.g. inside a container
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$ROOT/bin/_env.sh"
+require_install
+check_secrets
+check_home_ownership
+exec "$ROOT/bbot/.venv/bin/python" "$ROOT/web/mcp_server.py" "$@"

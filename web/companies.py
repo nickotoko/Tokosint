@@ -15,8 +15,9 @@ from datetime import datetime
 import cronexpr
 import notify
 import risk
-import scans
 import store
+
+import scans
 
 BASE_URL = ""  # set by the server: link to the timeline in Telegram messages
 SCHEDULER_TICK = 30
@@ -28,11 +29,15 @@ def _log(msg):
 
 
 def scan_name_for(company):
-    slug = re.sub(r"[^a-z0-9]+", "_", company["name"].lower()).strip("_")[:30] or "company"
+    slug = (
+        re.sub(r"[^a-z0-9]+", "_", company["name"].lower()).strip("_")[:30] or "company"
+    )
     return f"{slug}_{time.strftime('%Y%m%d_%H%M')}"
 
 
-def start_company_scan(company_id, modules, known_sources, schedule_id=None, name=None, targets=None):
+def start_company_scan(
+    company_id, modules, known_sources, schedule_id=None, name=None, targets=None
+):
     """Starts a scan linked to a company; targets default to the company's targets."""
     company = store.get_company(company_id)
     targets = targets or company["targets"]
@@ -43,7 +48,11 @@ def start_company_scan(company_id, modules, known_sources, schedule_id=None, nam
         {"targets": targets, "name": name, "modules": modules},
         known_sources,
         on_finish=process_scan,
-        meta={"company_id": company_id, "company": company["name"], "schedule_id": schedule_id},
+        meta={
+            "company_id": company_id,
+            "company": company["name"],
+            "schedule_id": schedule_id,
+        },
     )
     store.link_scan(job["name"], company_id, schedule_id, job["started"])
     return job
@@ -68,11 +77,15 @@ def _ingest(name, alert):
         return None
     import overrides  # overrides imports this module
 
-    findings = risk.annotate(overrides.apply(name, scans.aggregate_scan(path, with_false=False)))
+    findings = risk.annotate(
+        overrides.apply(name, scans.aggregate_scan(path, with_false=False))
+    )
     result = store.ingest(name, findings, scans.scan_started_at(path))
     if alert:
         company = store.get_company(result["company_id"])
-        store.set_alert_result(name, notify.alert_new_findings(company, name, result, BASE_URL))
+        store.set_alert_result(
+            name, notify.alert_new_findings(company, name, result, BASE_URL)
+        )
     return result
 
 
@@ -82,7 +95,9 @@ def process_scan(name, returncode=0):
         return
     result = _ingest(name, alert=True)
     if result:
-        _log(f"scan {name}: {'baseline' if result['baseline'] else 'new'} findings: {len(result['new'])}")
+        _log(
+            f"scan {name}: {'baseline' if result['baseline'] else 'new'} findings: {len(result['new'])}"
+        )
 
 
 def attach_scans(company_id, names):
@@ -115,9 +130,17 @@ def migrate_registries():
 def rebuild(company_id):
     store.reset_registry(company_id)
     done = []
-    for link in sorted(store.company_scans(company_id), key=lambda s: s["started_at"] or 0):
+    for link in sorted(
+        store.company_scans(company_id), key=lambda s: s["started_at"] or 0
+    ):
         result = _ingest(link["scan"], alert=False)
-        done.append({"scan": link["scan"], "ingested": bool(result), "new": len(result["new"]) if result else 0})
+        done.append(
+            {
+                "scan": link["scan"],
+                "ingested": bool(result),
+                "new": len(result["new"]) if result else 0,
+            }
+        )
     return done
 
 
@@ -129,7 +152,12 @@ def schedule_payload(data, known_sources):
     modules = data.get("modules") or []
     if not isinstance(modules, list) or any(m not in known_sources for m in modules):
         raise store.StoreError("unknown source in the module list")
-    return {"company_id": data.get("company_id"), "cron": cron, "modules": modules, "enabled": data.get("enabled", True)}
+    return {
+        "company_id": data.get("company_id"),
+        "cron": cron,
+        "modules": modules,
+        "enabled": data.get("enabled", True),
+    }
 
 
 def next_run_ts(cron):
@@ -147,22 +175,37 @@ def tick(known_sources_fn):
                 continue
             if s["next_run"] is None or s["next_run"] <= now:
                 # a missed run (server was down) runs once; the next one is computed from now
-                store.update_schedule_run(s["id"], pending=1, next_run=next_run_ts(s["cron"]))
-        if scans.running_job():
+                store.update_schedule_run(
+                    s["id"], pending=1, next_run=next_run_ts(s["cron"])
+                )
+        if not scans.has_capacity():
             return
         for s in store.list_schedules():
             if not (s["enabled"] and s["pending"]):
                 continue
             try:
-                job = start_company_scan(s["company_id"], s["modules"], known_sources_fn(), schedule_id=s["id"])
-                store.update_schedule_run(s["id"], pending=0, last_run=now, last_scan=job["name"])
-                _log(f"schedule {s['id']} ({s['company']}, {s['cron']}): started {job['name']}")
+                job = start_company_scan(
+                    s["company_id"],
+                    s["modules"],
+                    known_sources_fn(),
+                    schedule_id=s["id"],
+                )
+                store.update_schedule_run(
+                    s["id"], pending=0, last_run=now, last_scan=job["name"]
+                )
+                _log(
+                    f"schedule {s['id']} ({s['company']}, {s['cron']}): started {job['name']}"
+                )
             except scans.ScanError as e:
                 if e.code == 409 and "already running" in str(e):
                     return  # stays pending until the running scan finishes
-                store.update_schedule_run(s["id"], pending=0, last_run=now, last_scan=f"error: {e}")
+                store.update_schedule_run(
+                    s["id"], pending=0, last_run=now, last_scan=f"error: {e}"
+                )
             except store.StoreError as e:
-                store.update_schedule_run(s["id"], pending=0, last_run=now, last_scan=f"error: {e}")
+                store.update_schedule_run(
+                    s["id"], pending=0, last_run=now, last_scan=f"error: {e}"
+                )
             return  # one scan at a time
     finally:
         _tick_lock.release()

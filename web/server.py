@@ -48,20 +48,23 @@ WEB_DIR = Path(__file__).resolve().parent
 ROOT = WEB_DIR.parent
 
 sys.path.insert(0, str(WEB_DIR))
-from _build import build_chord, build_sources  # noqa: E402
-import health  # noqa: E402
-import scans  # noqa: E402
-import apikeys  # noqa: E402
-import companies  # noqa: E402
-import cronexpr  # noqa: E402
-import notify  # noqa: E402
-import store  # noqa: E402
-import overrides  # noqa: E402
-import enrich  # noqa: E402
-import quota  # noqa: E402
-import risk  # noqa: E402
-import proxy  # noqa: E402
-from bbot.core.modules import MODULE_LOADER  # noqa: E402
+import apikeys
+import companies
+import cronexpr
+import enrich
+import eventdb
+import findings
+import health
+import notify
+import overrides
+import proxy
+import quota
+import risk
+import store
+from _build import build_chord, build_sources
+from bbot.core.modules import MODULE_LOADER
+
+import scans
 
 BBOT_DOCS = ROOT / "bbot" / "docs"
 VEGA_FILES = {
@@ -74,7 +77,10 @@ I18N_FILES = {
     "ru.json": (WEB_DIR / "i18n_ru.json", "application/json; charset=utf-8"),
     "howto_ru.html": (WEB_DIR / "howto_ru.html", "text/html; charset=utf-8"),
 }
-VEGA_TYPES = {"js": "application/javascript; charset=utf-8", "json": "application/json; charset=utf-8"}
+VEGA_TYPES = {
+    "js": "application/javascript; charset=utf-8",
+    "json": "application/json; charset=utf-8",
+}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -99,26 +105,30 @@ class Handler(BaseHTTPRequestHandler):
         route, query = parsed.path, {k: v[0] for k, v in parse_qs(parsed.query).items()}
         try:
             if route in ("/", "/index.html"):
-                return self._send_file(WEB_DIR / "index.html", "text/html; charset=utf-8")
+                return self._send_file(
+                    WEB_DIR / "index.html", "text/html; charset=utf-8"
+                )
             if route == "/api/sources":
                 return self._send_json(build_sources())
             if route == "/api/chord":
                 return self._send_json(build_chord())
             if route.startswith("/i18n/"):
                 # interface translations: the dictionary and the Russian text of the "How it works" tab
-                name = route[len("/i18n/"):]
+                name = route[len("/i18n/") :]
                 if name not in I18N_FILES:
                     return self._send_json({"error": "not found"}, 404)
                 return self._send_file(*I18N_FILES[name])
             if route.startswith("/static/vega/"):
                 # BBoT's documentation bundles (vega, vega-embed, vega-lite) and its chord graph spec, served locally
-                name = route[len("/static/vega/"):]
+                name = route[len("/static/vega/") :]
                 if name not in VEGA_FILES:
                     return self._send_json({"error": "not found"}, 404)
-                return self._send_file(VEGA_FILES[name], VEGA_TYPES[name.rsplit(".", 1)[-1]])
+                return self._send_file(
+                    VEGA_FILES[name], VEGA_TYPES[name.rsplit(".", 1)[-1]]
+                )
             if route.startswith("/api/screenshot/"):
                 # /api/screenshot/<scan>/<path inside the scan>: a gowitness image (see scans.screenshot_file)
-                rest = unquote(route[len("/api/screenshot/"):])
+                rest = unquote(route[len("/api/screenshot/") :])
                 scan, _, rel = rest.partition("/")
                 f = scans.screenshot_file(scan, rel)
                 if f is None:
@@ -140,13 +150,32 @@ class Handler(BaseHTTPRequestHandler):
                 schedules = store.list_schedules()
                 out = store.list_companies()
                 for co in out:
-                    co["schedules"] = [s for s in schedules if s["company_id"] == co["id"]]
+                    co["schedules"] = [
+                        s for s in schedules if s["company_id"] == co["id"]
+                    ]
                 return self._send_json(out)
             if route.startswith("/api/timeline/"):
-                cid = int(route[len("/api/timeline/"):])
-                tl = store.timeline(cid, kind=query.get("kind"), type_=query.get("type"))
+                cid = int(route[len("/api/timeline/") :])
+                tl = store.timeline(
+                    cid, kind=query.get("kind"), type_=query.get("type")
+                )
                 risk.annotate(tl["events"])
                 return self._send_json(tl)
+            if route == "/api/findings":
+                # risk-bearing findings across companies (the Findings tab); ?companies=1,2 (empty = all),
+                # ?risk= ?type= ?status= ?q=
+                ids = [
+                    int(x)
+                    for x in str(query.get("companies", "")).split(",")
+                    if x.strip().isdigit()
+                ]
+                return self._send_json(findings.company_findings(
+                    ids, status=query.get("status"), risk_level=query.get("risk"),
+                    category=query.get("category"), q=query.get("q")))  # fmt: skip
+            if route.startswith("/api/company-assets/"):
+                # the Assets tab: all assets of a company (the Scans view at company scope)
+                cid = int(route[len("/api/company-assets/") :])
+                return self._send_json(findings.company_assets(cid))
             if route == "/api/cron":
                 try:
                     expr = cronexpr.validate(query.get("expr", ""))
@@ -158,7 +187,12 @@ class Handler(BaseHTTPRequestHandler):
                     runs.append(t.strftime("%Y-%m-%d %H:%M"))
                 return self._send_json({"cron": expr, "next": runs})
             if route == "/api/quota":
-                return self._send_json({"modules": quota.MODULE_ACCOUNT, "accounts": quota.snapshot(use_cache=True)})
+                return self._send_json(
+                    {
+                        "modules": quota.MODULE_ACCOUNT,
+                        "accounts": quota.snapshot(use_cache=True),
+                    }
+                )
             if route == "/api/status/log":
                 return self._send_json(store.override_log())
             if route == "/api/telegram":
@@ -166,30 +200,48 @@ class Handler(BaseHTTPRequestHandler):
             if route == "/api/proxy":
                 return self._send_json(proxy.view())
             if route == "/api/screenshots":
-                return self._send_json(scans.list_screenshots(query.get("scan") or None))
+                return self._send_json(
+                    scans.list_screenshots(query.get("scan") or None)
+                )
             if route.startswith("/api/report/"):
                 producers = {s["name"] for s in build_sources() if s["produced_events"]}
-                report = scans.scan_report(unquote(route[len("/api/report/"):]), producers)
+                report = scans.scan_report(
+                    unquote(route[len("/api/report/") :]), producers
+                )
                 if report is None:
                     return self._send_json({"error": "scan not found"}, 404)
                 return self._send_json(report)
             if route.startswith("/api/chain/"):
-                path = scans.safe_scan_path(unquote(route[len("/api/chain/"):]))
+                path = scans.safe_scan_path(unquote(route[len("/api/chain/") :]))
                 if path is None:
                     return self._send_json({"error": "scan not found"}, 404)
-                return self._send_json(scans.discovery_chains(path, query.get("type", ""), query.get("data", "")))
+                return self._send_json(
+                    scans.discovery_chains(
+                        path, query.get("type", ""), query.get("data", "")
+                    )
+                )
             if route.startswith("/api/scan/"):
-                path = scans.safe_scan_path(unquote(route[len("/api/scan/"):]))
+                path = scans.safe_scan_path(unquote(route[len("/api/scan/") :]))
                 if path is None:
                     return self._send_json({"error": "scan not found"}, 404)
-                name = unquote(route[len("/api/scan/"):])
+                name = unquote(route[len("/api/scan/") :])
                 # the scan together with its enrichments (new sources run over its findings later)
-                return self._send_json(risk.annotate(overrides.apply(name, scans.aggregate_scan(path, include_enrichments=True))))
+                return self._send_json(
+                    risk.annotate(
+                        overrides.apply(
+                            name, scans.aggregate_scan(path, include_enrichments=True)
+                        )
+                    )
+                )
             if route.startswith("/api/enrich/"):
-                name = unquote(route[len("/api/enrich/"):])
+                name = unquote(route[len("/api/enrich/") :])
                 modules = [m for m in str(query.get("modules", "")).split(",") if m]
                 try:
-                    return self._send_json(enrich.summary(enrich.plan(name, modules, MODULE_LOADER.preloaded())))
+                    return self._send_json(
+                        enrich.summary(
+                            enrich.plan(name, modules, MODULE_LOADER.preloaded())
+                        )
+                    )
                 except enrich.EnrichError as e:
                     return self._send_json({"error": str(e)}, e.code)
         except Exception as e:  # noqa: BLE001
@@ -206,7 +258,10 @@ class Handler(BaseHTTPRequestHandler):
         origin = self.headers.get("Origin")
         if origin is not None and origin != f"http://{host}":
             return False
-        return self.headers.get("Content-Type", "").split(";")[0].strip() == "application/json"
+        return (
+            self.headers.get("Content-Type", "").split(";")[0].strip()
+            == "application/json"
+        )
 
     def do_POST(self):
         route = urlparse(self.path).path
@@ -219,15 +274,29 @@ class Handler(BaseHTTPRequestHandler):
                 raise scans.ScanError("a JSON object is expected")
             known = {s["name"] for s in build_sources()}
             if route.startswith("/api/enrich/"):
-                name = unquote(route[len("/api/enrich/"):])
+                name = unquote(route[len("/api/enrich/") :])
                 modules = payload.get("modules") or []
-                if not isinstance(modules, list) or any(m not in known for m in modules):
-                    return self._send_json({"error": "unknown source in the module list"}, 400)
-                job = enrich.start(name, modules, MODULE_LOADER.preloaded(), known, on_finish=companies.process_scan)
+                if not isinstance(modules, list) or any(
+                    m not in known for m in modules
+                ):
+                    return self._send_json(
+                        {"error": "unknown source in the module list"}, 400
+                    )
+                job = enrich.start(
+                    name,
+                    modules,
+                    MODULE_LOADER.preloaded(),
+                    known,
+                    on_finish=companies.process_scan,
+                )
                 return self._send_json(job, 201)
             if route == "/api/scans/start":
                 if payload.get("company_id"):
-                    targets = scans.parse_targets(payload.get("targets")) if payload.get("targets") else None
+                    targets = (
+                        scans.parse_targets(payload.get("targets"))
+                        if payload.get("targets")
+                        else None
+                    )
                     name = str(payload.get("name") or "").strip().lower() or None
                     job = companies.start_company_scan(int(payload["company_id"]), payload.get("modules") or [], known,
                                                        name=name, targets=targets)  # fmt: skip
@@ -235,17 +304,23 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json(scans.start_scan(payload, known), 201)
             if route == "/api/companies/save":
                 cid = int(payload["id"]) if payload.get("id") else None
-                return self._send_json(store.save_company(payload, cid, parse_targets=scans.parse_targets))
+                return self._send_json(
+                    store.save_company(payload, cid, parse_targets=scans.parse_targets)
+                )
             if route == "/api/companies/delete":
                 store.delete_company(int(payload.get("id") or 0))
                 return self._send_json({"ok": True})
             if route == "/api/companies/attach":
                 names = [str(n) for n in (payload.get("scans") or [])]
-                return self._send_json(companies.attach_scans(int(payload.get("id") or 0), names))
+                return self._send_json(
+                    companies.attach_scans(int(payload.get("id") or 0), names)
+                )
             if route == "/api/schedules/save":
                 sid = int(payload["id"]) if payload.get("id") else None
                 data = companies.schedule_payload(payload, known)
-                return self._send_json(store.save_schedule(data, companies.next_run_ts(data["cron"]), sid))
+                return self._send_json(
+                    store.save_schedule(data, companies.next_run_ts(data["cron"]), sid)
+                )
             if route == "/api/schedules/delete":
                 store.delete_schedule(int(payload.get("id") or 0))
                 return self._send_json({"ok": True})
@@ -261,20 +336,41 @@ class Handler(BaseHTTPRequestHandler):
             if route == "/api/telegram/save":
                 return self._send_json(notify.save_settings(payload))
             if route == "/api/telegram/test":
-                ok, desc = notify.send("<b>Tokosint</b>: test message", payload.get("chat_id") or None)
+                ok, desc = notify.send(
+                    "<b>Tokosint</b>: test message", payload.get("chat_id") or None
+                )
                 return self._send_json({"ok": ok, "detail": desc}, 200 if ok else 502)
             if route in ("/api/keys/set", "/api/keys/delete"):
-                module, field = str(payload.get("module", "")), str(payload.get("field", ""))
+                module, field = (
+                    str(payload.get("module", "")),
+                    str(payload.get("field", "")),
+                )
                 if route.endswith("/set"):
-                    apikeys.set_secret(MODULE_LOADER.preloaded(), module, field, payload.get("value"))
+                    apikeys.set_secret(
+                        MODULE_LOADER.preloaded(), module, field, payload.get("value")
+                    )
                 else:
                     apikeys.delete_secret(MODULE_LOADER.preloaded(), module, field)
                 return self._send_json(apikeys.list_secrets(MODULE_LOADER.preloaded()))
             if route.startswith("/api/jobs/") and route.endswith("/stop"):
-                return self._send_json(scans.stop_scan(unquote(route[len("/api/jobs/"):-len("/stop")])))
-        except (scans.ScanError, apikeys.SecretError, store.StoreError, proxy.ProxyError) as e:
+                return self._send_json(
+                    scans.stop_scan(unquote(route[len("/api/jobs/") : -len("/stop")]))
+                )
+            if route.startswith("/api/scan/") and route.endswith("/delete-files"):
+                # free disk space on a large scan: import its events into the DB, then delete the big JSON files
+                name = unquote(route[len("/api/scan/") : -len("/delete-files")])
+                eventdb.import_scan(name)
+                return self._send_json(eventdb.delete_files(name))
+        except (
+            scans.ScanError,
+            apikeys.SecretError,
+            store.StoreError,
+            proxy.ProxyError,
+        ) as e:
             return self._send_json({"error": str(e)}, e.code)
-        except cronexpr.CronError as e:  # a ValueError: must be caught before "invalid JSON"
+        except (
+            cronexpr.CronError
+        ) as e:  # a ValueError: must be caught before "invalid JSON"
             return self._send_json({"error": f"cron: {e}"}, 400)
         except ValueError:
             return self._send_json({"error": "invalid JSON"}, 400)
@@ -306,16 +402,23 @@ def health_loop(idle_poll=60):
 
 
 def main():
+    import os
     import threading
 
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8777
+    # 127.0.0.1 by default; a container sets TOKOSINT_WEB_HOST=0.0.0.0 and publishes the port to the host's
+    # loopback only (docker-compose "127.0.0.1:8777:8777"), so the UI stays local-only either way.
+    host = os.environ.get("TOKOSINT_WEB_HOST", "127.0.0.1")
     store.init()
+    eventdb.init()
     companies.migrate_registries()
-    companies.BASE_URL = f"http://127.0.0.1:{port}/#timeline"
+    companies.BASE_URL = f"http://127.0.0.1:{port}/#findings"
     threading.Thread(target=health_loop, daemon=True).start()
-    known = lambda: {s["name"] for s in build_sources()}  # noqa: E731
-    threading.Thread(target=companies.scheduler_loop, args=(known,), daemon=True).start()
-    server = ThreadingHTTPServer(("127.0.0.1", port), partial(Handler))
+    known = lambda: {s["name"] for s in build_sources()}
+    threading.Thread(
+        target=companies.scheduler_loop, args=(known,), daemon=True
+    ).start()
+    server = ThreadingHTTPServer((host, port), partial(Handler))
     print(f"Open http://127.0.0.1:{port}/  (Ctrl+C to stop)")
     try:
         server.serve_forever()

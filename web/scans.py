@@ -27,12 +27,15 @@ OSINT = ROOT / "bin" / "osint"
 
 MAX_TARGETS = 20
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,59}$")
-DOMAIN_RE = re.compile(r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}$")
+DOMAIN_RE = re.compile(
+    r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}$"
+)
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 STATUS_RANK = {None: -1, "false": 0, "historical": 1, "valid": 2}
 
 
 # ---------- reading a scan ----------
+
 
 def safe_scan_dir(name):
     """Scan directory inside scans/; protects against path traversal."""
@@ -47,7 +50,18 @@ def safe_scan_dir(name):
 
 
 def scan_head(path):
-    """(start time, targets) of a scan from the SCAN event on the first line of its output.json."""
+    """(start time, targets) of a scan from the SCAN event on the first line of its output.json, or, once the scan
+    has been imported and its file deleted, from the import record in the database."""
+    if not Path(path).is_file():
+        import eventdb
+
+        try:
+            rec = eventdb.import_record(_name_of(path))
+        except Exception:  # noqa: BLE001
+            rec = None
+        if rec is not None:
+            return rec.get("started_at"), list(rec.get("targets") or [])
+        return None, []
     try:
         with open(path, encoding="utf-8") as fh:
             first = json.loads(fh.readline() or "{}")
@@ -59,7 +73,9 @@ def scan_head(path):
     started = dj.get("started_at")
     target = dj.get("target") or {}
     targets = target.get("seeds") or target.get("target") or []
-    return (float(started) if isinstance(started, (int, float)) else None), [str(t) for t in targets]
+    return (float(started) if isinstance(started, (int, float)) else None), [
+        str(t) for t in targets
+    ]
 
 
 def scan_started_at(path):
@@ -68,11 +84,15 @@ def scan_started_at(path):
 
 
 def safe_scan_path(name):
+    """The scan's output.json path, or None. Returns the (conceptual) path when the file was deleted after an
+    import: the events are then read from the database via events_for, so downstream readers work unchanged."""
     d = safe_scan_dir(name)
     if d is None:
         return None
     out = d / "output.json"
-    return out if out.is_file() else None
+    if out.is_file():
+        return out
+    return out if _imported(name) else None
 
 
 SCREENSHOT_TYPES = {".jpeg": "image/jpeg", ".jpg": "image/jpeg", ".png": "image/png"}
@@ -101,7 +121,9 @@ def _scan_root(d):
     while name not in seen:
         seen.add(name)
         try:
-            parent = json.loads((SCANS_DIR / name / "enrich.json").read_text()).get("parent")
+            parent = json.loads((SCANS_DIR / name / "enrich.json").read_text()).get(
+                "parent"
+            )
         except (OSError, ValueError):
             parent = None
         if not parent:
@@ -121,27 +143,44 @@ def list_screenshots(scan=None):
     if not SCANS_DIR.is_dir():
         return {"scans": [], "shots": []}
     for d in sorted(SCANS_DIR.iterdir()):
-        if not (d.is_dir() and (d / "gowitness" / "screenshots").is_dir() and (d / "output.json").is_file()):
+        if not (
+            d.is_dir()
+            and (d / "gowitness" / "screenshots").is_dir()
+            and ((d / "output.json").is_file() or _imported(d.name))
+        ):
             continue
         root = _scan_root(d)
         if want and root != want:
             continue
-        events = read_events(d / "output.json")
+        events = events_for(d / "output.json")
         urls = {e.get("id"): e for e in events if e.get("type") == "URL"}
         for e in events:
             if e.get("type") != "WEBSCREENSHOT":
                 continue
-            data = e.get("data") if isinstance(e.get("data"), dict) else (e.get("data_json") or {})
+            data = (
+                e.get("data")
+                if isinstance(e.get("data"), dict)
+                else (e.get("data_json") or {})
+            )
             if not data.get("path") or screenshot_file(d.name, data["path"]) is None:
                 continue
             tags = e.get("tags") or []
-            status = next((t[len("validity-"):] for t in tags if t.startswith("validity-")), None)
+            status = next(
+                (t[len("validity-") :] for t in tags if t.startswith("validity-")), None
+            )
             page = urls.get(e.get("parent"))
             # the code the browser got; screenshots taken before gowitness recorded it fall back to the http
             # module's answer for the same URL (the first answer, before redirects)
             code, code_from = data.get("status_code"), "browser"
             if not code and page:
-                code = next((int(t[7:]) for t in page.get("tags") or [] if t.startswith("status-") and t[7:].isdigit()), None)
+                code = next(
+                    (
+                        int(t[7:])
+                        for t in page.get("tags") or []
+                        if t.startswith("status-") and t[7:].isdigit()
+                    ),
+                    None,
+                )
                 code_from = "http" if code else None
             shots.append({"scan": d.name, "root": root, "path": data["path"], "url": data.get("url"),
                           "page": (asset_data(page) if page else None) or data.get("url"), "status_code": code,
@@ -150,7 +189,10 @@ def list_screenshots(scan=None):
                           "redirect_chain": data.get("redirect_chain"), "at": e.get("timestamp")})  # fmt: skip
             per_scan[d.name] = per_scan.get(d.name, 0) + 1
     shots.sort(key=lambda x: (x["root"], -(x["at"] or 0), x["url"] or ""))
-    scans_out = [{"name": n, "root": _scan_root(SCANS_DIR / n), "count": c} for n, c in sorted(per_scan.items())]
+    scans_out = [
+        {"name": n, "root": _scan_root(SCANS_DIR / n), "count": c}
+        for n, c in sorted(per_scan.items())
+    ]
     return {"scans": scans_out, "shots": shots}
 
 
@@ -168,6 +210,44 @@ def read_events(path):
     return events
 
 
+def _name_of(path):
+    """The scan name of an output.json path (scans/<name>/output.json)."""
+    return Path(path).parent.name
+
+
+def _imported(name):
+    """True if the scan's events are in the database. Any DB error (e.g. the tables are not set up in a unit test)
+    means "not imported", so callers fall back to reading the files."""
+    import eventdb
+
+    try:
+        return eventdb.is_imported(name)
+    except Exception:  # noqa: BLE001 - fall back to the file on any DB problem
+        return False
+
+
+def events_for(path):
+    """Events of the scan whose output is `path`: from the database once the scan is imported, else from the file.
+    Lets aggregation, chains and the report run unchanged after the large output.json has been deleted."""
+    import eventdb
+
+    name = _name_of(path)
+    if _imported(name):
+        return eventdb.events_of(name)
+    return read_events(path) if Path(path).is_file() else []
+
+
+def false_for(path):
+    """False findings of the scan whose output is `path` (validity_false.jsonl), from the database or the file."""
+    import eventdb
+
+    name = _name_of(path)
+    if _imported(name):
+        return eventdb.false_of(name)
+    log = Path(path).parent / "validity_false.jsonl"
+    return read_events(log) if log.is_file() else []
+
+
 def asset_data(e):
     """String form of an event's finding (for dicts - host/url/name/...).
 
@@ -183,7 +263,14 @@ def asset_data(e):
     if e.get("type") == "TECHNOLOGY" and d.get("technology"):
         return str(d["technology"])
     # always a string: ASN data is a number, while the UI sorts and searches strings
-    v = d.get("host") or d.get("url") or d.get("name") or d.get("asn") or d.get("ip") or d.get("description")
+    v = (
+        d.get("host")
+        or d.get("url")
+        or d.get("name")
+        or d.get("asn")
+        or d.get("ip")
+        or d.get("description")
+    )
     return str(v) if v is not None else json.dumps(d, ensure_ascii=False)
 
 
@@ -238,7 +325,9 @@ def read_false(path):
 # Source dates that modules wrote into the discovery context before events had last_seen (older scans):
 # "seen 2017-06-24 .. 2026-11-06" (robtex, circl_pdns), "observed 2024-05-01 .. 2024-06-01" (shodan_idb),
 # "(seen 2024-05-01)" (netlas). The last date of the range is the last observation.
-_CONTEXT_DATES = re.compile(r"\b(?:seen|observed) (\d{4}-\d{2}-\d{2})(?: \.\. (\d{4}-\d{2}-\d{2}))?")
+_CONTEXT_DATES = re.compile(
+    r"\b(?:seen|observed) (\d{4}-\d{2}-\d{2})(?: \.\. (\d{4}-\d{2}-\d{2}))?"
+)
 
 
 def context_last_seen(context):
@@ -246,7 +335,9 @@ def context_last_seen(context):
     if not m:
         return None
     try:
-        day = datetime.datetime.strptime(m.group(2) or m.group(1), "%Y-%m-%d").replace(tzinfo=datetime.timezone.utc)
+        day = datetime.datetime.strptime(m.group(2) or m.group(1), "%Y-%m-%d").replace(
+            tzinfo=datetime.timezone.utc
+        )
     except ValueError:
         return None
     return day.timestamp()
@@ -296,13 +387,21 @@ def aggregate_scan(path, with_false=True, include_enrichments=False):
     unless another path confirmed the finding, with the reason in false_reasons.
     include_enrichments - add the findings of the scan's enrichments (new sources run over its findings later):
     their seeds are the scan's own findings and are not counted again; "enriched_by" names the enrichment scans."""
-    events = read_events(path)
-    extra = [(name, read_events(p), p) for name, p in enrichment_outputs(path)] if include_enrichments else []
+    events = events_for(path)
+    extra = (
+        [(name, events_for(p), p) for name, p in enrichment_outputs(path)]
+        if include_enrichments
+        else []
+    )
     status = compute_status(events + [e for _, evs, _ in extra for e in evs])
     by_key = {}
     scan_date = scan_started_at(path)
     if scan_date is None:
-        stamps = [e["timestamp"] for e in events if isinstance(e.get("timestamp"), (int, float))]
+        stamps = [
+            e["timestamp"]
+            for e in events
+            if isinstance(e.get("timestamp"), (int, float))
+        ]
         scan_date = min(stamps) if stamps else None
     # domains promoted into scope by related_domains (a subsidiary, a second brand): uuid of the promotion -> domain
     promoted = {e["uuid"]: str(e.get("data")) for e in events
@@ -318,7 +417,10 @@ def aggregate_scan(path, with_false=True, include_enrichments=False):
             by_key[key] = a
         return a
 
-    groups = [(None, events, {})] + [(name, evs, {e["uuid"]: e for e in evs if e.get("uuid")}) for name, evs, _ in extra]
+    groups = [(None, events, {})] + [
+        (name, evs, {e["uuid"]: e for e in evs if e.get("uuid")})
+        for name, evs, _ in extra
+    ]
     original = set()
     for enrichment, group, group_uuids in groups:
         if enrichment and not original:
@@ -341,7 +443,11 @@ def aggregate_scan(path, with_false=True, include_enrichments=False):
             if enrichment:
                 # the path continues from the seed: the related domains of the seed's finding in the original scan
                 seed = group_uuids.get(chain[0]) if chain else None
-                seed_asset = by_key.get(f"{seed.get('type')}\x00{asset_data(seed)}") if seed else None
+                seed_asset = (
+                    by_key.get(f"{seed.get('type')}\x00{asset_data(seed)}")
+                    if seed
+                    else None
+                )
                 via |= set((seed_asset or {}).get("via") or ())
                 if f"{etype}\x00{data}" not in original:
                     # new to the original scan (not a re-observation, e.g. the DNS records of a seed)
@@ -370,9 +476,17 @@ def aggregate_scan(path, with_false=True, include_enrichments=False):
             if etype == "WEBSCREENSHOT":
                 # gowitness: the image file lives in the scan that took it (an enrichment has its own folder);
                 # the screenshot also goes to the URL it shows, so the URL's card and the gallery can show it
-                d = e.get("data") if isinstance(e.get("data"), dict) else (e.get("data_json") or {})
+                d = (
+                    e.get("data")
+                    if isinstance(e.get("data"), dict)
+                    else (e.get("data_json") or {})
+                )
                 # a failed shot of an older gowitness run points at the folder: only real image files count
-                if d.get("path") and screenshot_file(enrichment or path.parent.name, d["path"]) is not None:
+                if (
+                    d.get("path")
+                    and screenshot_file(enrichment or path.parent.name, d["path"])
+                    is not None
+                ):
                     shot = {"scan": enrichment or path.parent.name, "path": d["path"], "url": d.get("url") or data,
                             "status_code": d.get("status_code"), "title": d.get("title"),
                             "requested_url": d.get("requested_url"), "status_reason": d.get("status_reason"),
@@ -381,20 +495,30 @@ def aggregate_scan(path, with_false=True, include_enrichments=False):
                         a["codes"].add(int(d["status_code"]))
                     a["screenshots"].setdefault(shot["path"], shot)
                     parent = by_id.get(e.get("parent"))
-                    target = by_key.get(f"URL\x00{asset_data(parent)}") if parent is not None else None
+                    target = (
+                        by_key.get(f"URL\x00{asset_data(parent)}")
+                        if parent is not None
+                        else None
+                    )
                     if target is not None:
                         target["screenshots"].setdefault(shot["path"], shot)
             ctx = e.get("discovery_context")
             if ctx and len(a["contexts"]) < MAX_CONTEXTS:
-                a["contexts"].setdefault(f"{module}\x00{ctx}", {"module": module, "context": ctx[:500]})
+                a["contexts"].setdefault(
+                    f"{module}\x00{ctx}", {"module": module, "context": ctx[:500]}
+                )
             seen = e.get("last_seen")
             if seen is None:
                 seen = context_last_seen(e.get("discovery_context"))
-            if isinstance(seen, (int, float)) and (a["last_seen"] is None or seen > a["last_seen"]):
+            if isinstance(seen, (int, float)) and (
+                a["last_seen"] is None or seen > a["last_seen"]
+            ):
                 a["last_seen"] = seen
 
     if with_false:
-        false_records = list(read_false(path)) + [r for _, _, p in extra for r in read_false(p)]
+        false_records = list(false_for(path)) + [
+            r for _, _, p in extra for r in false_for(p)
+        ]
         for r in false_records:
             if not r.get("type") or r.get("data") is None:
                 continue
@@ -405,8 +529,15 @@ def aggregate_scan(path, with_false=True, include_enrichments=False):
             if module:
                 a["sources"].add(module)
             reason = r.get("reason") or "descendant of a false finding"
-            entry = {"module": module, "reason": reason, "hidden": bool(r.get("hidden"))}
-            if entry not in a["false_reasons"] and len(a["false_reasons"]) < MAX_CONTEXTS:
+            entry = {
+                "module": module,
+                "reason": reason,
+                "hidden": bool(r.get("hidden")),
+            }
+            if (
+                entry not in a["false_reasons"]
+                and len(a["false_reasons"]) < MAX_CONTEXTS
+            ):
                 a["false_reasons"].append(entry)
 
     out = []
@@ -415,28 +546,39 @@ def aggregate_scan(path, with_false=True, include_enrichments=False):
         if "in-scope" in tags:
             # a name that entered scope later (a domain promoted by related_domains) is not a third party
             tags.discard("third-party")
-        out.append({
-            "type": a["type"],
-            "data": a["data"],
-            "sources": sorted(a["sources"]),
-            "tags": sorted(tags),
-            "last_seen": a["last_seen"],
-            "scan_date": scan_date,
-            "status": a["status"],
-            "details": a["details"],
-            "contexts": list(a["contexts"].values()),
-            "false_reasons": a["false_reasons"],
-            "hosts": sorted(a["hosts"]),
-            "ports": sorted(a["ports"]),
-            "on": [{"host": h, "ports": sorted(p)} for h, p in sorted(a["on"].items())],
-            "via": sorted(a["via"] or ()),
-            "enriched_by": sorted(a["enriched_by"]),
-            "screenshots": list(a["screenshots"].values()),
-            "registrable": is_registrable(a["type"], a["data"]),
-            # HTTP status codes of a URL (http's status-NNN tags; several when the answer changed between paths)
-            # (a screenshot: the code the browser got, after redirects)
-            "http_status": sorted({int(t[7:]) for t in tags if t.startswith("status-") and t[7:].isdigit()} | a["codes"]),
-        })
+        out.append(
+            {
+                "type": a["type"],
+                "data": a["data"],
+                "sources": sorted(a["sources"]),
+                "tags": sorted(tags),
+                "last_seen": a["last_seen"],
+                "scan_date": scan_date,
+                "status": a["status"],
+                "details": a["details"],
+                "contexts": list(a["contexts"].values()),
+                "false_reasons": a["false_reasons"],
+                "hosts": sorted(a["hosts"]),
+                "ports": sorted(a["ports"]),
+                "on": [
+                    {"host": h, "ports": sorted(p)} for h, p in sorted(a["on"].items())
+                ],
+                "via": sorted(a["via"] or ()),
+                "enriched_by": sorted(a["enriched_by"]),
+                "screenshots": list(a["screenshots"].values()),
+                "registrable": is_registrable(a["type"], a["data"]),
+                # HTTP status codes of a URL (http's status-NNN tags; several when the answer changed between paths)
+                # (a screenshot: the code the browser got, after redirects)
+                "http_status": sorted(
+                    {
+                        int(t[7:])
+                        for t in tags
+                        if t.startswith("status-") and t[7:].isdigit()
+                    }
+                    | a["codes"]
+                ),
+            }
+        )
     out.sort(key=lambda a: (-len(a["sources"]), a["type"], a["data"]))
     return out
 
@@ -447,7 +589,14 @@ MAX_CHAINS = 20
 
 
 def _freshness(e):
-    return next((t[len("freshness-"):] for t in e.get("tags") or [] if t.startswith("freshness-")), None)
+    return next(
+        (
+            t[len("freshness-") :]
+            for t in e.get("tags") or []
+            if t.startswith("freshness-")
+        ),
+        None,
+    )
 
 
 def _chain_of(e, by_uuid, status):
@@ -463,16 +612,18 @@ def _chain_of(e, by_uuid, status):
             steps.append({"type": str(u).split(":", 1)[0], "data": None, "module": None, "context": text[:500],
                           "status": None, "freshness": None, "in_output": False})  # fmt: skip
             continue
-        steps.append({
-            "type": ev.get("type"),
-            "data": asset_data(ev),
-            # raw module: "A" / "MX" (a DNS record of live resolution) and "SEED" say more than "dnsresolve"
-            "module": ev.get("module"),
-            "context": (ev.get("discovery_context") or text)[:500],
-            "status": status.get(ev.get("id")),
-            "freshness": _freshness(ev),
-            "in_output": True,
-        })
+        steps.append(
+            {
+                "type": ev.get("type"),
+                "data": asset_data(ev),
+                # raw module: "A" / "MX" (a DNS record of live resolution) and "SEED" say more than "dnsresolve"
+                "module": ev.get("module"),
+                "context": (ev.get("discovery_context") or text)[:500],
+                "status": status.get(ev.get("id")),
+                "freshness": _freshness(ev),
+                "in_output": True,
+            }
+        )
     return steps
 
 
@@ -506,8 +657,8 @@ def discovery_chains(path, etype, data, include_enrichments=True):
     output: its chain is the parent's chain plus a last step with the reason it was dropped or hidden.
     A finding of an enrichment scan continues the shortest chain of its seed in the original scan; the steps made by
     the enrichment carry "scan": <enrichment scan name>."""
-    events = read_events(path)
-    false_records = list(read_false(path))
+    events = events_for(path)
+    false_records = list(false_for(path))
     found = _chains_in(events, false_records, etype, data)
     if include_enrichments:
         base_cache = {}
@@ -515,14 +666,21 @@ def discovery_chains(path, etype, data, include_enrichments=True):
         def base_of(seed_type, seed_data):
             key = (seed_type, seed_data)
             if key not in base_cache:
-                own = sorted(_chains_in(events, false_records, *key), key=lambda c: len(c["steps"]))
+                own = sorted(
+                    _chains_in(events, false_records, *key),
+                    key=lambda c: len(c["steps"]),
+                )
                 base_cache[key] = own[0]["steps"] if own else []
             return base_cache[key]
 
         for name, p in enrichment_outputs(path):
-            for c in _chains_in(read_events(p), list(read_false(p)), etype, data):
+            for c in _chains_in(events_for(p), list(false_for(p)), etype, data):
                 steps = [dict(st, scan=name) for st in c["steps"]]
-                if steps and steps[0]["module"] == "SEED" and steps[0]["data"] is not None:
+                if (
+                    steps
+                    and steps[0]["module"] == "SEED"
+                    and steps[0]["data"] is not None
+                ):
                     base = base_of(steps[0]["type"], steps[0]["data"])
                     if base:
                         # the seed is the last step of its chain in the original scan
@@ -536,7 +694,13 @@ def discovery_chains(path, etype, data, include_enrichments=True):
             chains.append(c)
     chains.sort(key=lambda c: (len(c["steps"]), "false_reason" in c))
     total, chains = len(chains), chains[:MAX_CHAINS]
-    return {"type": etype, "data": data, "total": total, "chains": chains, "graph": chains_graph(chains, etype, data)}
+    return {
+        "type": etype,
+        "data": data,
+        "total": total,
+        "chains": chains,
+        "graph": chains_graph(chains, etype, data),
+    }
 
 
 STATUS_ORDER = {None: -1, "false": 0, "historical": 1, "valid": 2}
@@ -568,7 +732,10 @@ def chains_graph(chains, etype, data):
                     n["false_reason"] = c["false_reason"]
                     n["hidden"] = c.get("hidden", False)
             if prev is not None and prev != nid:
-                e = edges.setdefault((prev, nid), {"from": prev, "to": nid, "modules": [], "context": st["context"]})
+                e = edges.setdefault(
+                    (prev, nid),
+                    {"from": prev, "to": nid, "modules": [], "context": st["context"]},
+                )
                 if st["module"] and st["module"] not in e["modules"]:
                     e["modules"].append(st["module"])
             prev = nid
@@ -576,6 +743,7 @@ def chains_graph(chains, etype, data):
 
 
 # ---------- per-source report ----------
+
 
 def _console_log(name):
     p = SCANS_DIR / f"{name}.console.log"
@@ -621,7 +789,14 @@ def source_problems(stats, state, detail):
     for kind, label in PROBLEM_LABELS.items():
         n = (stats.get("outcomes") or {}).get(kind)
         if n:
-            out.append({"kind": kind, "label": label, "count": n, "sample": (stats.get("errors") or {}).get(kind, "")})
+            out.append(
+                {
+                    "kind": kind,
+                    "label": label,
+                    "count": n,
+                    "sample": (stats.get("errors") or {}).get(kind, ""),
+                }
+            )
     if state in ("failed", "error"):
         out.append({"kind": state, "label": "did not start" if state == "failed" else "stopped (error state)",
                     "count": None, "sample": detail})  # fmt: skip
@@ -635,13 +810,15 @@ def scan_report(name, producers=None):
     (report modules such as affiliates) are left out of the report when they found nothing."""
     d = safe_scan_dir(name)
     path = d / "output.json" if d else None
-    if path is None or not path.is_file():
+    if path is None or (not path.is_file() and not _imported(name)):
         return None
-    events = read_events(path)
+    events = events_for(path)
     status = compute_status(events)
 
     scan_info = {}
-    per = defaultdict(lambda: {"events": 0, "assets": set(), "types": Counter(), "status": Counter()})
+    per = defaultdict(
+        lambda: {"events": 0, "assets": set(), "types": Counter(), "status": Counter()}
+    )
     asset_sources = defaultdict(set)
     for e in events:
         etype = e.get("type")
@@ -664,16 +841,21 @@ def scan_report(name, producers=None):
             p["status"][status.get(e.get("id")) or "none"] += 1
 
     false_by_module = Counter()
-    false_log = d / "validity_false.jsonl"
-    if false_log.is_file():
-        for r in read_events(false_log):
-            false_by_module[source_name(r.get("module"))] += 1
+    for r in false_for(path):
+        false_by_module[source_name(r.get("module"))] += 1
 
     loaded, failed, errored = parse_console(_console_log(name))
     mstats = quota.module_stats(d)
     # internal/output modules make no API requests; sources with requests are in the report even without data
     requested = {m for m, st in mstats.items() if st.get("requests")}
-    names = set(per) | set(loaded) | set(failed) | set(errored) | set(false_by_module) | requested
+    names = (
+        set(per)
+        | set(loaded)
+        | set(failed)
+        | set(errored)
+        | set(false_by_module)
+        | requested
+    )
     sources = []
     for m in names:
         p = per.get(m)
@@ -690,19 +872,21 @@ def scan_report(name, producers=None):
             state, detail = "ok", ""
         else:
             state, detail = "nodata", ""
-        sources.append({
-            "name": m,
-            "state": state,
-            "detail": detail,
-            "events": p["events"] if p else 0,
-            "assets": assets,
-            "only": only,
-            "types": dict(p["types"].most_common()) if p else {},
-            "status": dict(p["status"]) if p else {},
-            "false": false_by_module.get(m, 0),
-            "quota": quota.scan_quota(d, m),
-            "problems": source_problems(mstats.get(m) or {}, state, detail),
-        })
+        sources.append(
+            {
+                "name": m,
+                "state": state,
+                "detail": detail,
+                "events": p["events"] if p else 0,
+                "assets": assets,
+                "only": only,
+                "types": dict(p["types"].most_common()) if p else {},
+                "status": dict(p["status"]) if p else {},
+                "false": false_by_module.get(m, 0),
+                "quota": quota.scan_quota(d, m),
+                "problems": source_problems(mstats.get(m) or {}, state, detail),
+            }
+        )
     sources.sort(key=lambda s: (-s["assets"], s["name"]))
 
     target = scan_info.get("target") or {}
@@ -716,7 +900,10 @@ def scan_report(name, producers=None):
         by_type[a["type"]] += 1
         if "third-party" in a["tags"]:
             third_party += 1
-        check = next((t[len("dns-check-"):] for t in a["tags"] if t.startswith("dns-check-")), None)
+        check = next(
+            (t[len("dns-check-") :] for t in a["tags"] if t.startswith("dns-check-")),
+            None,
+        )
         if check:
             dns_check[check] += 1
     return {
@@ -742,13 +929,23 @@ def scan_report(name, producers=None):
 
 # ---------- starting scans ----------
 
+
 class ScanError(Exception):
     def __init__(self, msg, code=400):
         super().__init__(msg)
         self.code = code
 
 
-_jobs = {}  # scan name -> {"proc", "targets", "started", "log"}
+# A bounded pool runs scans concurrently (TOKOSINT_MAX_SCANS, default 2); further requests queue.
+# Each scan runs with its own BBoT home (DNS cache, temp) so parallel scans do not share mutable state;
+# the heavy downloaded tools/lib (gowitness etc.) are symlinked from a shared base and fetched once.
+MAX_CONCURRENT = max(1, int(os.environ.get("TOKOSINT_MAX_SCANS", "2") or "2"))
+HOMES_DIR = SCANS_DIR / ".homes"
+BBOT_BASE = Path(
+    os.environ.get("TOKOSINT_BBOT_BASE", str(Path.home() / ".bbot"))
+).expanduser()
+
+_jobs = {}  # scan name -> job record (see _reserve); insertion order is the queue order
 _lock = threading.Lock()
 
 
@@ -761,7 +958,11 @@ def parse_targets(raw):
         if not t:
             continue
         try:
-            out.append(str(ipaddress.ip_network(t, strict=False)) if "/" in t else str(ipaddress.ip_address(t)))
+            out.append(
+                str(ipaddress.ip_network(t, strict=False))
+                if "/" in t
+                else str(ipaddress.ip_address(t))
+            )
             continue
         except ValueError:
             pass
@@ -796,56 +997,198 @@ def default_name(targets):
     return f"{base}_{time.strftime('%Y%m%d_%H%M')}"
 
 
-def running_job():
+def _scan_home(name):
+    """An isolated BBoT working directory for one scan under scans/.homes/<name>.
+
+    The large, read-only tools and lib (downloaded binaries such as gowitness, ~700 MB) are symlinked from the
+    shared base (TOKOSINT_BBOT_BASE, default ~/.bbot) so they are not copied per scan; cache and temp are the
+    scan's own, so concurrent scans never write the same cache. Falls back to the shared base if symlinking fails."""
+    home = HOMES_DIR / name
+    try:
+        home.mkdir(parents=True, exist_ok=True)
+        for sub in ("tools", "lib"):
+            src = BBOT_BASE / sub
+            if not src.is_dir():
+                continue
+            link = home / sub
+            if not link.exists():
+                link.symlink_to(src.resolve(), target_is_directory=True)
+        return home
+    except OSError:
+        return BBOT_BASE
+
+
+def _cleanup_home(name):
+    """Remove a finished scan's working home (its output lives in scans/<name>, independent of the home).
+    rmtree does not follow the tools/lib symlinks, so the shared base is untouched."""
+    import shutil
+
+    with contextlib.suppress(OSError):
+        shutil.rmtree(HOMES_DIR / name, ignore_errors=True)
+
+
+def _build_cmd(name, targets, modules, targets_file, seeds_file, config, home):
+    cmd = [str(OSINT), "-t", *([str(targets_file)] if targets_file else targets), "-n", name, "-y", "--no-deps",
+           "-c", "scope.report_distance=1", "-c", f"home={home}", *config]  # fmt: skip
+    if seeds_file:
+        cmd += ["-s", str(seeds_file)]
+    cmd += ["-m", *modules] if modules else ["-f", "passive"]
+    return cmd
+
+
+# ---- pool state (helpers assume the caller holds _lock unless noted) ----
+
+_ACTIVE = ("launching", "running")
+
+
+def _active_count():
+    return sum(1 for j in _jobs.values() if j["state"] in _ACTIVE)
+
+
+def _queued_names():
+    return [n for n, j in _jobs.items() if j["state"] == "queued"]
+
+
+def has_capacity():
+    """True if a new scan can start right now without queueing."""
     with _lock:
+        return _active_count() < MAX_CONCURRENT
+
+
+def running_jobs():
+    """Names of scans whose process is currently running."""
+    with _lock:
+        out = []
         for name, j in _jobs.items():
-            if j["proc"].poll() is None:
-                return name
-    return None
+            proc = j.get("proc")
+            if j["state"] in _ACTIVE and (proc is None or proc.poll() is None):
+                out.append(name)
+    return out
 
 
-def start_scan(payload, known_sources, on_finish=None, meta=None, targets_file=None, seeds_file=None, config=()):
-    """payload: {targets, name?, modules?: [...]} - empty modules = the whole passive set.
+def running_job():
+    """The name of one running scan, or None. Kept for callers that only need to know if anything is running."""
+    names = running_jobs()
+    return names[0] if names else None
 
+
+def queued_jobs():
+    with _lock:
+        return _queued_names()
+
+
+def start_scan(
+    payload,
+    known_sources,
+    on_finish=None,
+    meta=None,
+    targets_file=None,
+    seeds_file=None,
+    config=(),
+):
+    """Validate a scan request, reserve its name and either launch it or queue it (see the pool note above).
+
+    payload: {targets, name?, modules?: [...]} - empty modules = the whole passive set.
     on_finish(name, returncode) is called from a watcher thread when the BBoT process exits;
     meta (e.g. company/schedule ids) is kept with the job and shown in job_info.
     targets_file / seeds_file - BBoT reads targets (scope) / seeds (what modules start from) from these files
-    (enrichment of a finished scan, web/enrich.py); config - extra "key=value" BBoT options."""
-    targets = parse_targets(payload.get("targets")) if targets_file is None else list(payload.get("targets") or [])
+    (enrichment of a finished scan, web/enrich.py); config - extra "key=value" BBoT options.
+    Returns job_info(name); a queued scan has state "queued" and starts when a slot frees."""
+    targets = (
+        parse_targets(payload.get("targets"))
+        if targets_file is None
+        else list(payload.get("targets") or [])
+    )
     name = str(payload.get("name") or "").strip().lower() or default_name(targets)
     if not NAME_RE.match(name):
-        raise ScanError("scan name: lowercase latin letters, digits, _ and -, up to 60 characters")
+        raise ScanError(
+            "scan name: lowercase latin letters, digits, _ and -, up to 60 characters"
+        )
     modules = payload.get("modules") or []
     if not isinstance(modules, list) or any(m not in known_sources for m in modules):
         raise ScanError("unknown source in the module list")
 
-    busy = running_job()
-    if busy:
-        raise ScanError(f"scan {busy} is already running: wait for it or stop it", 409)
-    if (SCANS_DIR / name).exists() or name in _jobs:
-        raise ScanError(f"scan {name} already exists, choose another name", 409)
+    with _lock:
+        if (SCANS_DIR / name).exists() or name in _jobs:
+            raise ScanError(f"scan {name} already exists, choose another name", 409)
+        SCANS_DIR.mkdir(exist_ok=True)
+        _jobs[name] = {
+            "state": "queued",
+            "targets": targets,
+            "modules": modules,
+            "meta": dict(meta or {}),
+            "on_finish": on_finish,
+            "started": time.time(),
+            "proc": None,
+            "returncode": None,
+            "stopping": False,
+            "log": SCANS_DIR / f"{name}.console.log",
+            "cmd_args": (
+                name,
+                targets,
+                modules,
+                targets_file,
+                seeds_file,
+                list(config),
+            ),
+        }
+    _dispatch()
+    return job_info(name)
 
-    cmd = [str(OSINT), "-t", *([str(targets_file)] if targets_file else targets), "-n", name, "-y", "--no-deps",
-           "-c", "scope.report_distance=1", *config]  # fmt: skip
-    if seeds_file:
-        cmd += ["-s", str(seeds_file)]
-    cmd += ["-m", *modules] if modules else ["-f", "passive"]
-    SCANS_DIR.mkdir(exist_ok=True)
+
+def _dispatch():
+    """Launch queued scans while the pool has free slots. Safe to call from several watcher threads."""
+    while True:
+        with _lock:
+            if _active_count() >= MAX_CONCURRENT:
+                return
+            name = next(iter(_queued_names()), None)
+            if name is None:
+                return
+            _jobs[name]["state"] = (
+                "launching"  # reserve the slot before we release the lock
+            )
+        try:
+            _launch(name)
+        except Exception as e:  # noqa: BLE001 - a failed launch must not wedge the queue
+            import sys
+
+            with _lock:
+                j = _jobs.get(name)
+                if j is not None:
+                    j["state"], j["returncode"] = "done", -1
+            sys.stderr.write(f"  failed to launch scan {name}: {e}\n")
+
+
+def _launch(name):
+    j = _jobs[name]
+    cmd_name, targets, modules, targets_file, seeds_file, config = j["cmd_args"]
+    home = _scan_home(cmd_name)
+    cmd = _build_cmd(cmd_name, targets, modules, targets_file, seeds_file, config, home)
     # quota of the sources' accounts right before the scan (account endpoints spend no quota); written next to
     # the scan's output when it ends, together with the snapshot after it
     quota_before = quota.snapshot(modules or None)
-    log_path = SCANS_DIR / f"{name}.console.log"
-    with open(log_path, "w", encoding="utf-8") as log:
+    with open(j["log"], "w", encoding="utf-8") as log:
         # preexec_fn only resets a signal handler - no locks, safe with the server's threads
         proc = subprocess.Popen(
-            cmd, cwd=str(ROOT), stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
-            start_new_session=True, env=_child_env(), preexec_fn=_restore_sigint,  # noqa: PLW1509
+            cmd,
+            cwd=str(ROOT),
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+            env=_child_env(),
+            preexec_fn=_restore_sigint,  # noqa: PLW1509
         )
     with _lock:
-        _jobs[name] = {"proc": proc, "targets": targets, "modules": modules, "started": time.time(), "log": log_path,
-                       "meta": dict(meta or {})}  # fmt: skip
-    threading.Thread(target=_watch, args=(name, proc, on_finish, modules, quota_before), daemon=True).start()
-    return job_info(name)
+        j["proc"] = proc
+        j["state"] = "running"
+        j["started_run"] = time.time()
+    threading.Thread(
+        target=_watch,
+        args=(name, proc, j["on_finish"], modules, quota_before),
+        daemon=True,
+    ).start()
 
 
 def _watch(name, proc, on_finish, modules=None, quota_before=None):
@@ -853,8 +1196,19 @@ def _watch(name, proc, on_finish, modules=None, quota_before=None):
     scan_dir = SCANS_DIR / name
     if scan_dir.is_dir():
         with contextlib.suppress(OSError):
-            (scan_dir / "quota_before.json").write_text(json.dumps(quota_before or {}, indent=1))
+            (scan_dir / "quota_before.json").write_text(
+                json.dumps(quota_before or {}, indent=1)
+            )
         quota.save_snapshot(scan_dir, "after", modules or None)
+    with _lock:
+        j = _jobs.get(name)
+        if j is not None:
+            j["state"], j["returncode"] = "done", rc
+    _cleanup_home(name)
+    _dispatch()  # a slot is free: start the next queued scan
+    _import_to_db(
+        name
+    )  # the database becomes the source of truth; the output.json can then be deleted
     if on_finish is None:
         return
     try:
@@ -863,6 +1217,46 @@ def _watch(name, proc, on_finish, modules=None, quota_before=None):
         import sys
 
         sys.stderr.write(f"  post-processing of scan {name} failed: {e}\n")
+
+
+def _import_to_db(name):
+    """Best-effort import of a finished scan's events into the database. A failure just leaves the files as the
+    source (events_for falls back to them), so it never breaks a scan."""
+    scan_dir = SCANS_DIR / name
+    if not (scan_dir / "output.json").is_file():
+        return
+    try:
+        import eventdb
+
+        eventdb.import_scan(name, replace=True)
+    except Exception as e:  # noqa: BLE001
+        import sys
+
+        sys.stderr.write(f"  importing scan {name} into the database failed: {e}\n")
+    cache_findings(name)
+
+
+def cache_findings(name):
+    """Cache the scan's risk-bearing findings in the database for the cross-company Findings view (best-effort).
+
+    Only findings that carry a risk level are stored (login pages, exposed ports/services, vulnerabilities, leaks -
+    not the plain valid inventory). Enrichments are their own linked scans and are cached separately, so this
+    aggregates the scan alone (include_enrichments=False) and the Findings view unions across a company's scans."""
+    import eventdb
+    import risk
+
+    path = safe_scan_path(name)
+    if path is None:
+        return
+    try:
+        findings = risk.annotate(
+            aggregate_scan(path, with_false=False, include_enrichments=False)
+        )
+        eventdb.store_findings(name, [f for f in findings if f.get("risk")])
+    except Exception as e:  # noqa: BLE001
+        import sys
+
+        sys.stderr.write(f"  caching findings of scan {name} failed: {e}\n")
 
 
 def _tail(path, n=12):
@@ -876,38 +1270,73 @@ def _tail(path, n=12):
     return [ANSI_RE.sub("", x) for x in text.splitlines()[-n:]]
 
 
+def _queue_position(name):
+    q = _queued_names()
+    return q.index(name) + 1 if name in q else None
+
+
 def job_info(name):
-    j = _jobs.get(name)
-    if j is None:
-        return None
-    rc = j["proc"].poll()
-    return {
-        "name": name,
-        "targets": j["targets"],
-        "modules": j["modules"],
-        "started": j["started"],
-        "running": rc is None,
-        "returncode": rc,
-        "stopping": j.get("stopping", False),
-        "meta": j.get("meta", {}),
-        "log": _tail(j["log"]),
-    }
+    with _lock:
+        j = _jobs.get(name)
+        if j is None:
+            return None
+        proc = j.get("proc")
+        rc = proc.poll() if proc is not None else None
+        state = j["state"]
+        pos = _queue_position(name) if state == "queued" else None
+        log = j.get("log")
+        info = {
+            "name": name,
+            "targets": j["targets"],
+            "modules": j["modules"],
+            "started": j["started"],
+            "running": state in _ACTIVE and rc is None,
+            "state": state,
+            "queued": state == "queued",
+            "queue_position": pos,
+            "returncode": j.get("returncode")
+            if j.get("returncode") is not None
+            else rc,
+            "stopping": j.get("stopping", False),
+            "meta": j.get("meta", {}),
+        }
+    info["log"] = _tail(log) if log is not None and Path(log).exists() else []
+    return info
 
 
 def list_jobs():
+    """All jobs this process knows about, newest first (running, queued, finished)."""
     with _lock:
         names = sorted(_jobs, key=lambda n: _jobs[n]["started"], reverse=True)
     return [job_info(n) for n in names]
 
 
+def pool_status():
+    """Pool capacity and queue, for the UI and MCP."""
+    with _lock:
+        active, queued = _active_count(), len(_queued_names())
+    return {"max_concurrent": MAX_CONCURRENT, "running": active, "queued": queued}
+
+
 def stop_scan(name):
-    j = _jobs.get(name)
-    if j is None or j["proc"].poll() is not None:
-        raise ScanError("scan is not running", 404)
+    """Stop a running scan (SIGINT - BBoT writes its output) or drop a queued one before it starts."""
+    with _lock:
+        j = _jobs.get(name)
+        if j is None:
+            raise ScanError("scan is not running", 404)
+        if j["state"] == "queued":
+            j["state"], j["returncode"] = "cancelled", -1
+            proc = None
+        else:
+            proc = j.get("proc")
+            if j["state"] not in _ACTIVE or proc is None or proc.poll() is not None:
+                raise ScanError("scan is not running", 404)
+            j["stopping"] = True
+    if proc is None:  # a queued scan was dropped before it started
+        return job_info(name)
     # on Ctrl+C BBoT finishes the scan cleanly and writes its output
-    os.killpg(j["proc"].pid, signal.SIGINT)
-    j["stopping"] = True
-    threading.Thread(target=_ensure_stopped, args=(j["proc"],), daemon=True).start()
+    os.killpg(proc.pid, signal.SIGINT)
+    threading.Thread(target=_ensure_stopped, args=(proc,), daemon=True).start()
     return job_info(name)
 
 
@@ -924,22 +1353,34 @@ def list_scans():
     scans = []
     if SCANS_DIR.is_dir():
         for d in sorted(SCANS_DIR.iterdir()):
+            if not d.is_dir() or d.name.startswith("."):
+                continue
             out = d / "output.json"
-            if d.is_dir() and out.is_file():
+            on_disk = out.is_file()
+            if not on_disk and not _imported(d.name):
+                continue  # a scan folder with neither its output.json nor an import (e.g. a work directory)
+            if on_disk:
                 try:
                     with open(out, encoding="utf-8") as fh:
                         events = sum(1 for _ in fh)
                 except OSError:
                     events = 0
-                started, targets = scan_head(out)
-                try:
-                    enrich_of = json.loads((d / "enrich.json").read_text()).get("parent")
-                except (OSError, ValueError):
-                    enrich_of = None
-                scans.append({"name": d.name, "events": events, "mtime": int(out.stat().st_mtime),
-                              "started_at": started, "targets": targets, "enrich_of": enrich_of})  # fmt: skip
-    running = running_job()
+                mtime = int(out.stat().st_mtime)
+            else:
+                # the output.json was deleted after import: events live in the database
+                import eventdb
+
+                events = eventdb.event_count(d.name) or 0
+                mtime = int(d.stat().st_mtime)
+            started, targets = scan_head(out)
+            try:
+                enrich_of = json.loads((d / "enrich.json").read_text()).get("parent")
+            except (OSError, ValueError):
+                enrich_of = None
+            scans.append({"name": d.name, "events": events, "mtime": mtime, "imported": not on_disk,
+                          "started_at": started, "targets": targets, "enrich_of": enrich_of})  # fmt: skip
+    running = set(running_jobs())
     for s in scans:
-        s["running"] = s["name"] == running
+        s["running"] = s["name"] in running
     scans.sort(key=lambda s: s["mtime"], reverse=True)
     return scans

@@ -1,0 +1,24 @@
+# Keep the build context small and the image clean: never copy the host's venv, scans, caches or secrets.
+.git
+.bbot-upstream.git
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+.benchmarks
+
+# Runtime data (bind-mounted at runtime, must not be baked into the image)
+scans
+data
+web/health.json
+web/data
+
+# Host-only material
+config/ca-bundle.pem
+docs/private
+*.log
+.DS_Store
+theHarvester
+config/secrets.yml
+config/secrets.pending.yml

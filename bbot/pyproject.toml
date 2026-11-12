@@ -85,6 +85,9 @@ dev = [
     "ruff==0.16.2",
     "maturin>=1.4,<2",
 ]
+mcp = [
+    "mcp>=1.2.0,<2",
+]
 docs = [
     "mkdocs>=1.5.2,<2",
     "mkdocs-extra-sass-plugin>=0.1.0,<1",

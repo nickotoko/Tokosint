@@ -1,0 +1,43 @@
+# Tokosint: web UI + MCP server from one image, sharing the scans, database and config.
+#
+#   docker compose up -d            build (first time) and start both services
+#   docker compose logs -f web      follow the web backend
+#   docker compose run --rm osint -t example.com -m crt -y -n demo   run a one-off scan
+#
+# Both services publish to the host's loopback only (127.0.0.1): inside the container they bind 0.0.0.0, but the
+# web UI and MCP server have no authentication, so they must never be exposed on a routable address.
+services:
+  web:
+    build: .
+    image: tokosint
+    command: ["web", "8777"]
+    ports:
+      - "127.0.0.1:8777:8777"
+    volumes:
+      - ./scans:/app/scans
+      - ./data:/app/data
+      - ./config:/app/config
+    restart: unless-stopped
+
+  mcp:
+    build: .
+    image: tokosint
+    command: ["mcp", "8778"]
+    ports:
+      - "127.0.0.1:8778:8778"
+    volumes:
+      - ./scans:/app/scans
+      - ./data:/app/data
+      - ./config:/app/config
+    restart: unless-stopped
+
+  # One-off scans: `docker compose run --rm osint -t example.com -m crt -y -n demo`
+  osint:
+    build: .
+    image: tokosint
+    entrypoint: ["/app/bin/docker-entrypoint.sh", "osint"]
+    volumes:
+      - ./scans:/app/scans
+      - ./data:/app/data
+      - ./config:/app/config
+    profiles: ["cli"]
